@@ -111,40 +111,39 @@ def fetch_status_id(db_manager, retry_thresh=10):
         instance_query = f"'{','.join(limit_set)}'" if limit_set else ""
         if instance_query:
             query = f"""
-                SELECT sid, status, instance_name, id
-                FROM livefeeds
-                WHERE status = 'pending'
-                AND (instance_name NOT IN ({instance_query}))
-                LIMIT 5;
+                UPDATE livefeeds
+                SET status = 'read'
+                WHERE sid = (
+                    SELECT sid
+                    FROM livefeeds
+                    WHERE status = 'pending'
+                    AND (instance_name NOT IN ({instance_query}))
+                    LIMIT 1
+                )
+                RETURNING sid, status, instance_name, id
             """
         else:
             query = """
-                SELECT sid, status, instance_name, id
-                FROM livefeeds
-                WHERE status = 'pending'
-                LIMIT 5;
+                UPDATE livefeeds
+                SET status = 'read'
+                WHERE sid = (
+                    SELECT sid
+                    FROM livefeeds
+                    WHERE status = 'pending'
+                    LIMIT 1
+                )
+                RETURNING sid, status, instance_name, id
             """
         cursor = db_manager.connection.execute(query)
-        candidates = cursor.fetchall()
+        candidate = cursor.fetchone()
 
-        if not candidates and not limit_set:
+        if not candidate and not limit_set:
             logger.info("No eligible statuses found and limit_set is empty. Terminating task.")
             return None, True
 
-        for candidate in candidates:
-            sid = candidate[0]
-            update_query = """
-                UPDATE livefeeds
-                SET status = 'read'
-                WHERE sid = ? AND status = 'pending'
-                RETURNING sid
-            """
-            cursor = db_manager.connection.execute(update_query, (sid,))
-
-            row = cursor.fetchone()
-            if row:
-                logger.info(f"Found status ID: {sid}")
-                return candidate, False
+        if candidate:
+            logger.info(f"Found status ID: {candidate[0]}")
+            return candidate, False
 
         logger.info(f"No matching statuses found, retrying... Attempt {retry_time}")
         time.sleep(2)
