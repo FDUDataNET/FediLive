@@ -40,7 +40,7 @@ ___________________________________________________________________________
 
     Each machine must have MongoDB installed. In config.yaml, set mongodb_central to the same machine and mongodb_local to the local machine itself. For the API, apply for central_token at https://instances.social/api/token. This token will be used to collect the list of Mastodon instances. For details, please see https://instances.social/.
 
-    To allow every machine to access the MongoDB on the central node, I suggest changing the net.bindIp setting in the MongoDB configuration file (mongo.conf) to 0.0.0.0. Additionally, I recommend changing the port and adding an access username and password to prevent access by unauthorized personnel. (If you are not sure how to configure it, please check [here](#mongodb-configure) for the recommended configuration tutorial.)
+    To allow every machine to access the MongoDB on the central node, I suggest changing the net.bindIp setting in the MongoDB configuration file (mongo.conf) to 0.0.0.0. Additionally, I recommend changing the port and adding an access username and password to prevent access by unauthorized personnel. (If you are not sure how to configure it, please check [the recommended configuration tutorial](#mongodb-configure).)
 
     ```yaml
     mongodb_central:
@@ -86,13 +86,13 @@ ___________________________________________________________________________
 Run this on the central node to fetch all Mastodon instances and store their information in MongoDB.
 
 ```bash
-python ./fetcher/masto_list_fetcher
+python ./fetcher/masto_list_fetcher.py
 ```
 
 ### 2. Fetch Toots
 Run this on multiple machines in parallel.
 ```bash
-python ./fetcher/livefeeds_worker --id 0 --processnum 2 --start "2024-01-01 00:00:00" --end "2024-01-02 00:00:00"
+python ./fetcher/livefeeds_worker.py --id 0 --processnum 2 --start "2024-01-01 00:00:00" --end "2024-01-02 00:00:00"
 ```
 Parameters:
 
@@ -105,7 +105,7 @@ Parameters:
 Run this on multiple machines in parallel.
 
 ```bash
-python ./fetcher/reblog_favourite --processnum 3
+python ./fetcher/reblog_favourite.py --processnum 3
 ```
 Parameters:
 
