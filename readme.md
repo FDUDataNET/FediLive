@@ -55,8 +55,8 @@ ___________________________________________________________________________
     - `instance_token`: Apply for instance_token at https://instances.social/api/token. This token will be used to collect the list of Mastodon instances. For details, please see https://instances.social/.
     - `livefeeds_token`: This token will be used to collect toots from various Mastodon instances. Tokens can be requested following the guidelines at https://docs.joinmastodon.org/.
   
-   - **Paths**：
-   - 
+   - **Paths**：file save paths
+   - `instances_list`: Save the retrieved list of instances.
 
    - **Logging Configuration**:
      - `level`: Sets the logging level (e.g., DEBUG, INFO, WARNING, ERROR, CRITICAL).
