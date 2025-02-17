@@ -1,3 +1,16 @@
+FediLive
+==================
+
+FediLive is a data collection tool designed to quickly fetch *user interactions* from all Mastodon instances during a user-defined time period for downstream analysis.
+
+___________________________________________________________________________
+
+[![License][license-image]][license-url]
+
+[license-image]:https://img.shields.io/github/license/FDUDataNET/FediLive
+[license-url]: https://github.com/FDUDataNET/FediLive/blob/Single/LICENSE
+
+
 ## Installation
 
 1. **Clone the Repository**
@@ -22,7 +35,7 @@
 
 4. **Configure tokens and Logging**
 
-   Edit the `config/config.yaml` file with your API tokens and logging preferences.
+   Edit the `config/config.yaml` file with your API tokens, file save paths and logging preferences.
 
    ```yaml
    api:
@@ -37,6 +50,13 @@
      level: "INFO"
      file: "logs/app.log"
    ```
+
+   - **API Tokens**:
+    - `instance_token`: Apply for instance_token at https://instances.social/api/token. This token will be used to collect the list of Mastodon instances. For details, please see https://instances.social/.
+    - `livefeeds_token`: This token will be used to collect toots from various Mastodon instances. Tokens can be requested following the guidelines at https://docs.joinmastodon.org/.
+  
+   - **Paths**：
+   - 
 
    - **Logging Configuration**:
      - `level`: Sets the logging level (e.g., DEBUG, INFO, WARNING, ERROR, CRITICAL).
