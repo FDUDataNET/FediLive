@@ -17,7 +17,7 @@ ___________________________________________________________________________
 1. **Clone the Repository**
 
     ```bash
-    git clone -b Multi git@github.com:shaojiabing/FediLive.git
+    git clone -b Multi git@github.com:FDUDataNET/FediLive.git
     cd FediLive
     ```
 
@@ -40,7 +40,7 @@ ___________________________________________________________________________
 
     Each machine must have MongoDB installed. In config.yaml, set mongodb_central to the same machine and mongodb_local to the local machine itself. For the API, apply for central_token at https://instances.social/api/token. This token will be used to collect the list of Mastodon instances. For details, please see https://instances.social/.
 
-    To allow every machine to access the MongoDB on the central node, I suggest changing the net.bindIp setting in the MongoDB configuration file (mongo.conf) to 0.0.0.0. Additionally, I recommend changing the port and adding an access username and password to prevent access by unauthorized personnel.
+    To allow every machine to access the MongoDB on the central node, I suggest changing the net.bindIp setting in the MongoDB configuration file (mongo.conf) to 0.0.0.0. Additionally, I recommend changing the port and adding an access username and password to prevent access by unauthorized personnel. (If you are not sure how to configure it, please check [here](#mongodb-configure) for the recommended configuration tutorial.)
 
     ```yaml
     mongodb_central:
@@ -130,3 +130,29 @@ CRITICAL: A very serious error, indicating that the program itself may be unable
 
 ## Datasets
 We collected approximately two weeks of data using FediLive and have published it on Zenodo. You can download the dataset here: https://zenodo.org/records/14869106
+
+## MongoDB Configure
+
+### 1.Insatll MongoDB
+Visit [https://www.mongodb.com/try/download/community](https://www.mongodb.com/try/download/community) to download MongoDB.  
+Visit [https://www.mongodb.com/try/download/shell](https://www.mongodb.com/try/download/shell) to download mongosh.  
+Then install MongoDB on your server.  
+
+### 2.Modify the MongoDB configuration file
+Change net.bindIp to 0.0.0.0  
+Change net.port to non-default value (27017).  
+
+### 3.Add an access user
+In your terminal, run the following commands:  
+```bash
+mongosh --port your_port_number
+use admin
+db.createUser({
+  user: "your_username",
+  pwd: "your_password",
+  roles: [{ role: "root", db: "admin" }]
+})
+```
+
+### 4.Finished and modify /config/config.yaml
+Fill in the corresponding values in config.yaml.  
