@@ -111,6 +111,11 @@ Parameters:
 
 --processnum: Number of parallel processes.  
 
+### 4. Notes
+
+When fetching toots, some errors may occur, but they are handled within the code. Note that the instances list obtained in <1. Fetch Instance Information> includes not only Mastodon instances but also other platforms connected to Mastodon. As a result, errors may arise during fetching toots, because FediLive use [Mastodon REST API](https://docs.joinmastodon.org/) to fetch toots; in such cases, the corresponding instance's "processable" flag in the database will be set to false. If the target instance is busy during crawling, its "processable" flag will be changed to "server_busy". You can check the detailed crawling status using mongosh.
+
+
 ## Logging
 All operations and errors are logged to the file specified in the config/config.yaml under the logging section. By default, logs are saved to logs/app.log. You can adjust the logging level and log file path as needed.
 
