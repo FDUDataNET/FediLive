@@ -35,17 +35,17 @@ def remove_round_flag_instances(collection):
             collection.update_one({"_id": doc["_id"]}, {"$unset": unset_fields})
     logger.info(f"Removed round_*_id_range key")
 
-def drop_livefeeds(collection):
+def drop_collection(collections,name):
     """
-    Drops the provided collection (in this context, the local 'livefeeds' collection).
+    Drops the provided collection.
     If an error occurs during the drop operation, it logs the error.
     """
     
     try:
-        collection.drop()
-        logger.info("Droped local livefeeds.")
+        collections[name].drop()
+        logger.info(f"Droped local {name}.")
     except Exception as e:
-        logger.error(f"Droped local livefeeds ERROR: {e}")
+        logger.error(f"Droped local {name} ERROR: {e}")
 
 
 def main():
@@ -57,7 +57,7 @@ def main():
     3. Calls remove_round_flag_instances to process the 'instances' collection.
     4. Calls drop_livefeeds to delete the 'livefeeds' collection.
     """
-    
+
     config = Config()
     central_mongodb_uri = config.get_central_mongodb_uri()
     client = MongoClient(central_mongodb_uri)
@@ -76,7 +76,8 @@ def main():
     }
 
     remove_round_flag_instances(collections['instances'])
-    drop_livefeeds(collections['livefeeds'])
+    drop_collection(collections,'livefeeds')
+    drop_collection(collections,'boostersfavourites')
 
 if __name__ == "__main__":
     main()
