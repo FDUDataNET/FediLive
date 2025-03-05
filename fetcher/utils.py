@@ -183,3 +183,10 @@ def judge_api_islimit(limit_dict,limit_set):
             keys_deleted.append(key)
     for item in keys_deleted:
         del limit_dict[item]
+
+
+def update_round_idrange(instances_collection,instance_info,current_round_id_range):
+    try:
+        instances_collection.update_one({"name":instance_info['name']},{"$set":{f'round{instance_info['round']}_id_range':current_round_id_range}})
+    except Exception as e:
+        logger.error(f"update {instance_info['name']} current_round_id_range , but ERROR: {e}")

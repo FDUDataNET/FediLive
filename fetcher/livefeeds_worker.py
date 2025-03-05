@@ -10,7 +10,7 @@ import random
 import re
 import logging
 from utils import (
-    create_unique_index, judge_sleep, save_error_log,
+    create_unique_index, judge_sleep, update_round_idrange,
     transform_ISO2datetime, transform_str2datetime, compute_round_time
 )
 from config import Config
@@ -66,14 +66,14 @@ def fetch_instance(round_num, instances_collection, max_round):
         sort=[("statuses", -1)]
     )
 
-def fetch_livefeeds(instance_info, config, local_collections, tokens, worker_id, global_duration, max_round):
+def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, global_duration, max_round):
     """
     Fetches livefeeds (tweets) from a specific Mastodon instance.
     
     Args:
         instance_info (dict): Information about the instance.
         config (Config): Configuration object.
-        local_collections (dict): Local MongoDB collections.
+        collections (dict): MongoDB collections.
         tokens (list): List of API tokens.
         worker_id (int): ID of the worker.
         global_duration (dict): Dictionary containing 'start_time' and 'end_time'.
@@ -112,6 +112,7 @@ def fetch_livefeeds(instance_info, config, local_collections, tokens, worker_id,
                 data = response.json()
                 logger.info(f"Successfully fetched {len(data)} tweets.")
                 
+                # collect one toot from all instances rapidly to record the latest toot_id in specified duartion
                 if current_round == 0:
                     for item in data:
                         created_at = transform_ISO2datetime(item['created_at'])
@@ -123,21 +124,27 @@ def fetch_livefeeds(instance_info, config, local_collections, tokens, worker_id,
                             item['loadtime'] = datetime.now()
                             item['status'] = 'pending'
                             try:
-                                local_collections['livefeeds'].insert_one(item)
+                                collections['livefeeds'].insert_one(item)
                                 logger.info(f"Saved a tweet from {instance_name}.")
                             except DuplicateKeyError:
                                 logger.warning("Duplicate tweet found, skipping.")
                             except Exception as e:
                                 logger.error(f"Error saving tweet: {e}")
+                            update_round_idrange(collections['instances'],instance_info,id_range)
+                            
                         elif created_at < global_duration['start_time']:
                             logger.info(f"{instance_name} has no tweets in the specified duration.")
-                            local_collections['instances'].update_one(
+                            collections['instances'].update_one(
                                 {"name": instance_name},
-                                {"$set": {"round": max_round, "processable": False}}
+                                {"$set": {"round": max_round}}
                             )
-                            return
+                        return
+                # start to collect toots by round 
                 else:
                     current_duration = compute_current_duration(current_round, global_duration, max_round)
+                    if len(data) != 0:
+                        id_range['max'] = data[0]['id']
+                        id_range['min'] = data[-1]['id']
                     for item in data:
                         created_at = transform_ISO2datetime(item['created_at'])
                         if current_duration['start_time'] <= created_at <= current_duration['end_time']:
@@ -146,17 +153,14 @@ def fetch_livefeeds(instance_info, config, local_collections, tokens, worker_id,
                             item['loadtime'] = datetime.now()
                             item['status'] = 'pending'
                             try:
-                                local_collections['livefeeds'].insert_one(item)
+                                collections['livefeeds'].insert_one(item)
                                 logger.info(f"Saved a tweet from {instance_name}.")
                             except DuplicateKeyError:
                                 logger.warning("Duplicate tweet found, skipping.")
                             except Exception as e:
                                 logger.error(f"Error saving tweet: {e}")
                         else:
-                            local_collections['instances'].update_one(
-                                {"name": instance_name},
-                                {"$set": {"round": max_round}}
-                            )
+                            update_round_idrange(collections['instances'],instance_info,id_range)
                             return
                 
                 if 'link' not in res_headers or len(data) < 40:
@@ -169,33 +173,33 @@ def fetch_livefeeds(instance_info, config, local_collections, tokens, worker_id,
                 time.sleep(random.random())
                 logger.warning("Encountered 429 or 503 error, retrying...")
                 if retry_time > 4:
-                    local_collections['instances'].update_one(
+                    collections['instances'].update_one(
                         {"name": instance_name},
-                        {"$set": {"processable": False, "round": max_round}}
+                        {"$set": {"processable": "server_busy", "round": max_round}}
                     )
                     return
             else:
                 logger.error(f"Error fetching tweets from {instance_name}: {response.status_code}")
-                local_collections['instances'].update_one(
+                collections['instances'].update_one(
                     {"name": instance_name},
                     {"$set": {"round": max_round, "processable": False}}
                 )
                 return
         except requests.exceptions.Timeout:
             retry_time += 1
-            time.sleep(0.1)
+            time.sleep(random.random())
             logger.warning("Request timed out, retrying...")
             if retry_time > 4:
-                local_collections['instances'].update_one(
+                collections['instances'].update_one(
                     {"name": instance_name},
-                    {"$set": {"processable": False, "round": max_round}}
+                    {"$set": {"processable": False}}
                 )
                 return
         except Exception as e:
             logger.exception(f"Exception while connecting to {instance_name}")
-            local_collections['instances'].update_one(
+            collections['instances'].update_one(
                 {"name": instance_name},
-                {"$set": {"round": max_round, "processable": False}}
+                {"$set": {"processable": False}}
             )
             return
 
@@ -206,7 +210,7 @@ def process_task(worker_id, config, collections, tokens, global_duration, max_ro
     Args:
         worker_id (int): The ID of the worker.
         config (Config): Configuration object.
-        local_collections (dict): Local MongoDB collections.
+        collections (dict): MongoDB collections.
         tokens (list): List of API tokens.
         global_duration (dict): Dictionary containing 'start_time' and 'end_time'.
         max_round (int): The maximum number of rounds.

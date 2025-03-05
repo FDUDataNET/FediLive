@@ -106,8 +106,8 @@ Parameters:
 
 --id: Worker ID (starting from 0), used to select different API tokens.  
 --processnum: Number of parallel processes at each host.  
---start: Start time for fetching toots (format: YYYY-MM-DD HH:MM:SS).  
---end: End time for fetching toots (format: YYYY-MM-DD HH:MM:SS).  
+--start: Start time for fetching toots (format: YYYY-MM-DD HH:MM:SS) (UTC+0).  
+--end: End time for fetching toots (format: YYYY-MM-DD HH:MM:SS) (UTC+0).  
 
 ### 3. Fetch Reblogs and Favourites
 Run this on multiple machines in parallel.
