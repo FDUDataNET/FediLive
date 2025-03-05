@@ -167,3 +167,57 @@ db.createUser({
 
 ### 4.Finished and modify /config/config.yaml
 Fill in the corresponding values in config.yaml.  
+
+
+## Preprocessing Usage Guide
+
+### Data Preparation
+Place FediLive crawled JSON files in the data/ directory with the following naming conventions:   
+
+Reply data: reply*.json   
+Boost/Favorite data: boostersfavourites*.json   
+
+### Build Interaction Network
+```bash
+python preprocess/load_network.py --data_dir ./data
+```
+### Sample output:
+```bash
+Network loaded with 15420 nodes and 87364 edges
+```
+
+### Network Analysis
+```bash
+from preprocess.measure import calculate_metrics, analyze_cross_instance_statistics
+
+# Calculate global metrics
+metrics = calculate_metrics(G)
+"""
+Graph Metrics:
+  Nodes: 15420
+  Edges: 87364
+  Density: 0.000368
+  Average Degree: 5.668
+  Clustering Coefficient: 0.142
+  Average Shortest Path Length: 4.21
+"""
+# Cross-instance statistics
+cross_stats = analyze_cross_instance_statistics(G)
+"""
+{
+  'Total Edges': 87364,
+  'Cross-Instance Edges': 23658,
+  'Cross-Instance Edge Ratio': 0.271,
+  'Nodes Involved in Cross-Instance Interactions': 8421,
+  'Node Interaction Percentage': 54.63%
+}
+"""
+```
+### Group Analysis
+```bash
+# Analyze by instance groups
+instance_metrics = analyze_grouped_subgraphs(G, group_type='instance')
+
+# Analyze by edge types
+edge_metrics = analyze_grouped_subgraphs(G, group_type='edge_type')
+```
