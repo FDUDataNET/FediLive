@@ -12,11 +12,13 @@ ___________________________________________________________________________
 [license-url]: https://github.com/FDUDataNET/FediLive/blob/Multi/LICENSE
 
 ## Development Environment
-Tested on Ubuntu 20.04 LTS. Please ensure your system meets the following requirements:  
+Tested on Ubuntu 20.04 LTS. Please ensure your device meets the following requirements:  
 
 OS: Ubuntu 20.04 LTS (64-bit)  
 Memory: 8GB RAM (recommended)  
 Storage: 20GB available space  
+MongoDB: 5.0.30  
+Python: 3.9
 
 ## Installation
 
