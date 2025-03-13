@@ -1,4 +1,5 @@
 # fetcher/livefeeds_worker.py
+import sys
 import requests
 import time
 import argparse
@@ -15,7 +16,19 @@ from utils import (
 )
 from config import Config
 
+# Logger configuration: error-level logs only record to file, not output to console
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.DEBUG)
+console_handler.addFilter(lambda record: record.levelno < logging.ERROR)
+error_handler = logging.FileHandler("error.log", encoding="utf-8")
+error_handler.setLevel(logging.ERROR)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+error_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+logger.addHandler(error_handler)
 
 def compute_current_duration(current_round, global_duration, max_round):
     """
@@ -206,6 +219,10 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
 def process_task(worker_id, config, collections, tokens, global_duration, max_round):
     """
     Processes tasks by fetching instances and their tweets.
+    After finishing one round (iterating through all rounds), it checks if there are any instances
+    with "processable" set to "server_busy". If such instances exist and their reset count is less than 5,
+    it resets their processable flag to True and increments the reset count, then starts a new round.
+    The process continues until there are no eligible "server_busy" instances.
     
     Args:
         worker_id (int): The ID of the worker.
@@ -215,15 +232,49 @@ def process_task(worker_id, config, collections, tokens, global_duration, max_ro
         global_duration (dict): Dictionary containing 'start_time' and 'end_time'.
         max_round (int): The maximum number of rounds.
     """
-    for round_num in range(max_round + 1):
-        while True:
-            instance_info = fetch_instance(round_num - 1, collections['instances'], max_round)
-            if instance_info:
-                logger.info(f"Found instance: {instance_info['name']}, starting processing.")
-                fetch_livefeeds(instance_info, config, collections, tokens, worker_id, global_duration, max_round)
-            else:
-                logger.info(f"No more instances to process for round {round_num}.")
-                break
+    while True:
+        # Process each round
+        for round_num in range(max_round + 1):
+            while True:
+                instance_info = fetch_instance(round_num - 1, collections['instances'], max_round)
+                if instance_info:
+                    logger.info(f"Found instance: {instance_info['name']}, starting processing.")
+                    fetch_livefeeds(instance_info, config, collections, tokens, worker_id, global_duration, max_round)
+                else:
+                    logger.info(f"No more instances to process for round {round_num}.")
+                    break
+
+        # After completing a round, check if there are any instances marked as "server_busy" 
+        # that have been reset less than 5 times.
+        busy_count = collections['instances'].count_documents({
+            "processable": "server_busy",
+            "$or": [
+                {"reset_count": {"$exists": False}},
+                {"reset_count": {"$lt": 5}}
+            ]
+        })
+        if busy_count > 0:
+            logger.info("Resetting processable flag for eligible 'server_busy' instances to True.")
+            # Update only those instances with reset_count not yet 5.
+            collections['instances'].update_many(
+                {
+                    "processable": "server_busy",
+                    "$or": [
+                        {"reset_count": {"$exists": False}},
+                        {"reset_count": {"$lt": 5}}
+                    ]
+                },
+                {
+                    "$set": {"processable": True},
+                    "$inc": {"reset_count": 1}
+                }
+            )
+            # Optional: sleep for a while to ensure server load is reduced
+            time.sleep(5)
+        else:
+            # If no eligible instance is marked as server_busy, exit the loop
+            break
+
 
 def main():
     """
