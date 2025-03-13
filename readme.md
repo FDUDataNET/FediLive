@@ -16,7 +16,7 @@ ___________________________________________________________________________
 1. **Clone the Repository**
 
    ```bash
-   git clone -b Single git@github.com:shaojiabing/FediLive.git
+   git clone -b Single git@github.com:FDUDataNET/FediLive.git
    cd FediLive
    ```
 
