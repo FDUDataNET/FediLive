@@ -68,16 +68,19 @@ def main():
     local_client = MongoClient(local_mongodb_uri)
     local_db = local_client['mastodon']
     local_livefeeds_collection = local_db['livefeeds']
+    local_context_collection = local_db['context']
 
 
     collections = {
         'livefeeds': local_livefeeds_collection,
-        'instances': instances_collection
+        'instances': instances_collection,
+        'context' : local_context_collection
     }
 
     remove_round_flag_instances(collections['instances'])
     drop_collection(collections,'livefeeds')
     drop_collection(collections,'boostersfavourites')
+    drop_collection(collections,'context')
 
 if __name__ == "__main__":
     main()
