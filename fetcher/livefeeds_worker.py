@@ -136,6 +136,7 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                             item['sid'] = f"{instance_name}#{item['id']}"
                             item['loadtime'] = datetime.now()
                             item['status'] = 'pending'
+                            item['context_status'] = 'pending'
                             try:
                                 collections['livefeeds'].insert_one(item)
                                 logger.info(f"Saved a tweet from {instance_name}.")
@@ -165,6 +166,7 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                             item['sid'] = f"{instance_name}#{item['id']}"
                             item['loadtime'] = datetime.now()
                             item['status'] = 'pending'
+                            item['context_status'] = 'pending'
                             try:
                                 collections['livefeeds'].insert_one(item)
                                 logger.info(f"Saved a tweet from {instance_name}.")
