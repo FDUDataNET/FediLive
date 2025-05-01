@@ -17,6 +17,7 @@ from utils import (
 from config import Config
 
 # Logger configuration: error-level logs only record to file, not output to console
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 console_handler = logging.StreamHandler(sys.stdout)
@@ -43,10 +44,10 @@ def compute_current_duration(current_round, global_duration, max_round):
         dict: Dictionary with 'start_time' and 'end_time' for the current round.
     """
     if current_round < max_round:
-        new_start_time = global_duration['end_time'] - timedelta(hours=current_round)
+        new_start_time = global_duration['end_time'] - timedelta(hours=24*current_round)
     else:
         new_start_time = global_duration['start_time']
-    new_end_time = global_duration['end_time'] - timedelta(hours=current_round - 1)
+    new_end_time = global_duration['end_time'] - timedelta(hours=24*current_round-24)
     return {'start_time': new_start_time, 'end_time': new_end_time}
 
 def fetch_instance(round_num, instances_collection, max_round):
@@ -124,7 +125,7 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                 judge_sleep(res_headers, instance_name)
                 data = response.json()
                 logger.info(f"Successfully fetched {len(data)} tweets.")
-                
+
                 # collect one toot from all instances rapidly to record the latest toot_id in specified duartion
                 if current_round == 0:
                     for item in data:
@@ -187,7 +188,7 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                 retry_time += 1
                 time.sleep(random.random())
                 logger.warning("Encountered 429 or 503 error, retrying...")
-                if retry_time > 4:
+                if retry_time > 0:
                     collections['instances'].update_one(
                         {"name": instance_name},
                         {"$set": {"processable": "server_busy", "round": max_round}}
@@ -204,7 +205,7 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
             retry_time += 1
             time.sleep(random.random())
             logger.warning("Request timed out, retrying...")
-            if retry_time > 4:
+            if retry_time > 0:
                 collections['instances'].update_one(
                     {"name": instance_name},
                     {"$set": {"processable": False}}
@@ -218,7 +219,7 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
             )
             return
 
-def process_task(worker_id, config, collections, tokens, global_duration, max_round):
+def process_task(worker_id, config, mongo_args, tokens, global_duration, max_round):
     """
     Processes tasks by fetching instances and their tweets.
     After finishing one round (iterating through all rounds), it checks if there are any instances
@@ -234,6 +235,23 @@ def process_task(worker_id, config, collections, tokens, global_duration, max_ro
         global_duration (dict): Dictionary containing 'start_time' and 'end_time'.
         max_round (int): The maximum number of rounds.
     """
+
+    #client = MongoClient(mongo_args['mongo_uri'])
+    #db = client[mongo_args['db_name']]
+    #instances_collection = db[mongo_args['collections_names']['instances']]
+
+    local_client = MongoClient(mongo_args['local_mongo_uri'])
+    local_db = local_client[mongo_args['db_name']]
+    instances_collection = local_db[mongo_args['collections_names']['instances']]
+    local_livefeeds_collection = local_db[mongo_args['collections_names']['livefeeds']]
+    local_error_collection = local_db[mongo_args['collections_names']['error_log']]
+    create_unique_index(local_livefeeds_collection, 'sid')
+
+    collections = {
+        'livefeeds': local_livefeeds_collection,
+        'error_log': local_error_collection,
+        'instances': instances_collection
+    }
     while True:
         # Process each round
         for round_num in range(max_round + 1):
@@ -276,6 +294,8 @@ def process_task(worker_id, config, collections, tokens, global_duration, max_ro
         else:
             # If no eligible instance is marked as server_busy, exit the loop
             break
+    #client.close()
+    local_client.close()
 
 
 def main():
@@ -291,17 +311,17 @@ def main():
     
     config = Config()
     central_mongodb_uri = config.get_central_mongodb_uri()
-    client = MongoClient(central_mongodb_uri)
-    db = client['mastodon']
-    instances_collection = db['instances']
+    #client = MongoClient(central_mongodb_uri)
+    #db = client['mastodon']
+    #instances_collection = db['instances']
     
     local_mongodb_uri = config.get_local_mongodb_uri()
-    local_client = MongoClient(local_mongodb_uri)
-    local_db = local_client['mastodon']
-    local_livefeeds_collection = local_db['livefeeds']
-    local_error_collection = local_db['error_log']
+    #local_client = MongoClient(local_mongodb_uri)
+    #local_db = local_client['mastodon']
+    #local_livefeeds_collection = local_db['livefeeds']
+    #local_error_collection = local_db['error_log']
     
-    create_unique_index(local_livefeeds_collection, 'sid')
+
     
     with open(config.paths.get('token_list', 'tokens/token_list.txt'), 'r', encoding='utf-8') as f:
         tokens = f.read().splitlines()
@@ -313,24 +333,28 @@ def main():
     
     max_round = compute_round_time(global_duration)
     logger.info(f"Maximum rounds: {max_round}")
-    
-    collections = {
-        'livefeeds': local_livefeeds_collection,
-        'error_log': local_error_collection,
-        'instances': instances_collection
-    }
-    
+
     process_list = []
     for i in range(args.processnum):
-        p = Process(target=process_task, args=(args.id, config, collections, tokens, global_duration, max_round))
+        process_args = {
+            'mongo_uri': central_mongodb_uri,
+            'local_mongo_uri': local_mongodb_uri,
+            'db_name': 'mastodon',
+            'collections_names': {
+                'livefeeds': 'livefeeds',
+                'error_log': 'error_log',
+                'instances': 'instances'
+            },
+        }
+        p = Process(target=process_task, args=(args.id, config, process_args, tokens, global_duration, max_round))
         p.start()
         process_list.append(p)
     
     for p in process_list:
         p.join()
     
-    client.close()
-    local_client.close()
+    #client.close()
+    #local_client.close()
     logger.info("Livefeeds Worker task completed.")
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 # fetcher/reblog_favourite.py
+from _ast import arg
 import requests
 import time
 import re
@@ -13,11 +14,18 @@ from utils import judge_sleep_limit_table, judge_api_islimit, save_error_log, cr
 from config import Config
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler()  
+handler.setLevel(logging.DEBUG)    
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 
 limit_dict = {}
 limit_set = set()
 
-def get_favourite_boost(instance, status_id, headers, local_collections):
+def get_favourite_boost(instance, status_id, headers, local_collections,worker_id):
     """
     Fetches reblogs and favourites for a specific status.
     
@@ -32,11 +40,11 @@ def get_favourite_boost(instance, status_id, headers, local_collections):
     """
     reblog_url = f"https://{instance}/api/v1/statuses/{status_id}/reblogged_by"
     favourite_url = f"https://{instance}/api/v1/statuses/{status_id}/favourited_by"
-    
+
     reblogs = []
     favourites = []
     last_page_flag = -1
-    retry_thresh = 4
+    retry_thresh = 3
     
     for url, storage in [(reblog_url, reblogs), (favourite_url, favourites)]:
         retry_time = 0
@@ -56,6 +64,9 @@ def get_favourite_boost(instance, status_id, headers, local_collections):
                     match = re.search(r'max_id=(\d+)', res_headers.get('link', ''))
                     if match:
                         last_page_flag = match.group(1)
+                    else:
+                        break
+                    retry_time = 0
                 elif response.status_code in [503, 429]:
                     retry_time += 1
                     time.sleep(random.random())
@@ -64,22 +75,26 @@ def get_favourite_boost(instance, status_id, headers, local_collections):
                         limit_set.add(instance)
                         limit_dict[instance] = datetime.now(timezone.utc) + timedelta(minutes=5)
                         save_error_log(local_collections['error_log'], "booster_favouriter", f"{instance}#{status_id}", "429or503", error_message=response.text)
-
+                        return False
+                elif response.status_code in [401, 403, 404]:
+                    logger.error(f"Error :{response.status_code},worker_id: {worker_id},instance: {instance}")
+                    return False
                 else:
                     save_error_log(local_collections['error_log'], "booster_favouriter", f"{instance}#{status_id}", "Error", res_code=response.status_code, error_message=response.text)
                     logger.error(f"Error fetching reblogs/favourites for {instance}#{status_id}: {response.status_code}")
+                    return False
 
-            except requests.exceptions.Timeout:
-                retry_time += 1
-                time.sleep(random.random())
-                logger.warning("Request timed out, retrying...")
-                if retry_time > retry_thresh:
-                    save_error_log(local_collections['error_log'], "booster_favouriter", f"{instance}#{status_id}", "TimeOut")
+            #except requests.exceptions.Timeout:
+            #    retry_time += 1
+            #    time.sleep(random.random())
+            #    logger.warning("Request timed out, retrying...")
+            #    if retry_time > retry_thresh:
+            #        save_error_log(local_collections['error_log'], "booster_favouriter", f"{instance}#{status_id}", "TimeOut")
             except Exception as e:
                 save_error_log(local_collections['error_log'], "booster_favouriter", f"{instance}#{status_id}", "Error", error_message=str(e))
                 logger.exception(f"Exception while connecting to {instance}#{status_id}: {e}")
+                return False
 
-    
     if reblogs or favourites:
         sid = f"{instance}#{status_id}"
         try:
@@ -89,12 +104,17 @@ def get_favourite_boost(instance, status_id, headers, local_collections):
                 "favourites": favourites
             })
             logger.info(f"Successfully saved reblogs and favourites for {sid}.")
+            return True
         except DuplicateKeyError:
             logger.warning(f"Reblogs and favourites for {sid} already exist, skipping.")
+            return True
         except Exception as e:
             logger.error(f"Error saving reblogs/favourites for {sid}: {e}")
-    
-    return True
+            return False
+    else:
+        logger.warning(f"No reblogs or favourites found for {instance}#{status_id}")
+        return False
+
 
 def fetch_status_id(local_livefeeds_collection, limit_set, local_collections, retry_thresh=10):
     """
@@ -135,7 +155,7 @@ def fetch_status_id(local_livefeeds_collection, limit_set, local_collections, re
         if retry_time >= retry_thresh:
             return None
 
-def process_task(worker_id, config, local_collections, tokens, terminate_flag):
+def process_task(worker_id, config, mongo_args, tokens, terminate_flag):
     """
     Worker process task for fetching reblogs and favourites.
 
@@ -149,22 +169,40 @@ def process_task(worker_id, config, local_collections, tokens, terminate_flag):
     no_pending_counter = 0  # Counter to track consecutive iterations with no pending statuses
     inactivity_threshold = 10  # Number of consecutive iterations without pending statuses before termination
 
+
+    local_client = MongoClient(mongo_args['local_mongo_uri'])
+    local_db = local_client[mongo_args['db_name']]
+    local_livefeeds_collection = local_db[mongo_args['collections_names']['livefeeds']]
+    local_error_collection = local_db[mongo_args['collections_names']['error_log']]
+    local_boostersfavourites_collection = local_db[mongo_args['collections_names']['boostersfavourites']]
+    create_unique_index(local_boostersfavourites_collection, 'sid')
+
+    local_collections = {
+        'livefeeds': local_livefeeds_collection,
+        'error_log': local_error_collection,
+        'boostersfavourites': local_boostersfavourites_collection
+    }
+
     while not terminate_flag['terminate']:
         try:
             info = fetch_status_id(local_collections['livefeeds'], limit_set, local_collections)
             if info:
                 # Reset counter if a pending status is found
                 no_pending_counter = 0
-                token = tokens[worker_id]
-                headers = {'Authorization': f'Bearer {token}', 'Email': config.api.get('email', '')}
-                success = get_favourite_boost(info['instance_name'], info['id'], headers, local_collections)
-                if success:
-                    logger.info(f"Successfully fetched reblogs and favourites for {info['instance_name']}#{info['id']}")
-                # else:
-                #     local_collections['livefeeds'].update_one(
-                #         {"_id": info["_id"]},
-                #         {"$set": {"status": "pending"}}
-                #     )
+                current_token_index = worker_id % len(tokens)
+                token = tokens[current_token_index]
+                headers = {'Authorization': f'Bearer {token}'}
+                try:
+                    success = get_favourite_boost(info['instance_name'], info['id'], headers, local_collections,worker_id)
+                except Exception as e:
+                    logger.error(f"Error processing {info['instance_name']}#{info['id']}: {e}")
+                    success = False
+                logger.info(f"Worker {worker_id} success: {success}")
+                local_collections['livefeeds'].update_one(
+                    {"_id": info["_id"]},
+                    {"$set": {"status": "processed" if success else "fail"}}
+                )
+                continue
             else:
                 no_pending_counter += 1
                 logger.info(f"No pending statuses found, sleeping... (attempt {no_pending_counter})")
@@ -174,14 +212,9 @@ def process_task(worker_id, config, local_collections, tokens, terminate_flag):
                     terminate_flag['terminate'] = True
                     break
         except Exception as e:
-            # Ensure info is defined before using it in the error update
-            if 'info' in locals() and info and '_id' in info:
-                local_collections['livefeeds'].update_one(
-                    {"_id": info["_id"]},
-                    {"$set": {"status": "fail", "fail_reason": str(e)}}
-                )
             logger.exception(f"Exception during processing: {e}")
             time.sleep(5)
+    local_client.close()
 
 
 def main():
@@ -197,28 +230,38 @@ def main():
 
     
     local_mongodb_uri = config.get_local_mongodb_uri()
-    local_client = MongoClient(local_mongodb_uri)
-    local_db = local_client['mastodon']
-    local_livefeeds_collection = local_db['livefeeds']
-    local_error_collection = local_db['error_log']
-    local_boostersfavourites_collection = local_db['boostersfavourites']
+    #local_client = MongoClient(local_mongodb_uri)
+    #local_db = local_client['mastodon']
+    #local_livefeeds_collection = local_db['livefeeds']
+    #local_error_collection = local_db['error_log']
+    #local_boostersfavourites_collection = local_db['boostersfavourites']
     
-    create_unique_index(local_boostersfavourites_collection, 'sid')
+    #create_unique_index(local_boostersfavourites_collection, 'sid')
     
     with open(config.paths.get('token_list', 'tokens/token_list.txt'), 'r', encoding='utf-8') as f:
-        tokens = f.read().splitlines()
-    
-    local_collections = {
-        'livefeeds': local_livefeeds_collection,
-        'error_log': local_error_collection,
-        'boostersfavourites': local_boostersfavourites_collection
+        tokens = [line.strip() for line in f if line.strip()]
+    # 在 main 函数中打印 tokens
+    print("Loaded Tokens:", [f"{token[:5]}...{token[-5:]}" for token in tokens])
+    #local_collections = {
+    #    'livefeeds': local_livefeeds_collection,
+    #    'error_log': local_error_collection,
+    #    'boostersfavourites': local_boostersfavourites_collection
+    #}
+    process_args = {
+        'local_mongo_uri': local_mongodb_uri,
+        'db_name': 'mastodon',
+        'collections_names': {
+            'livefeeds': 'livefeeds',
+            'error_log': 'error_log',
+            'boostersfavourites': 'boostersfavourites'
+        },
     }
     
     terminate_flag = {'terminate': False}
     
     process_list = []
     for i in range(args.processnum):
-        p = Process(target=process_task, args=(args.id, config, local_collections, tokens, terminate_flag))
+        p = Process(target=process_task, args=(i, config, process_args, tokens, terminate_flag))
         p.start()
         process_list.append(p)
     
@@ -231,7 +274,7 @@ def main():
             p.terminate()
         logger.info("Terminated all processes.")
 
-    local_client.close()
+    #local_client.close()
     logger.info("Reblog and Favourite Worker task completed.")
 
 if __name__ == "__main__":
