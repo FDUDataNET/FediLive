@@ -236,13 +236,12 @@ def process_task(worker_id, config, mongo_args, tokens, global_duration, max_rou
         max_round (int): The maximum number of rounds.
     """
 
-    #client = MongoClient(mongo_args['mongo_uri'])
-    #db = client[mongo_args['db_name']]
-    #instances_collection = db[mongo_args['collections_names']['instances']]
+    client = MongoClient(mongo_args['mongo_uri'])
+    db = client[mongo_args['db_name']]
+    instances_collection = db[mongo_args['collections_names']['instances']]
 
     local_client = MongoClient(mongo_args['local_mongo_uri'])
     local_db = local_client[mongo_args['db_name']]
-    instances_collection = local_db[mongo_args['collections_names']['instances']]
     local_livefeeds_collection = local_db[mongo_args['collections_names']['livefeeds']]
     local_error_collection = local_db[mongo_args['collections_names']['error_log']]
     create_unique_index(local_livefeeds_collection, 'sid')
