@@ -44,9 +44,9 @@ Python: 3.9
 
 4. **Configure MongoDB and Logging**
 
-    Ensure you have MongoDB installed and running. Edit the `config/config.yaml` file with your MongoDB connection details, API tokens, and logging preferences.
-
-    Each machine must have MongoDB installed. In config.yaml, set mongodb_central to the same machine and mongodb_local to the local machine itself. For the API, apply for central_token at https://instances.social/api/token. This token will be used to collect the list of Mastodon instances. For details, please see https://instances.social/.
+    Ensure you have MongoDB installed and running. Edit the `config/config.yaml` file with your MongoDB connection details, API tokens, and logging preferences.  
+    This is a distributed parallel crawling program for multiple machines. First, a machine must be selected as the central node. This node is used to store instance information and the range of crawled data and publish crawling tasks to working nodes. The remaining machines act as working nodes to crawl data from the instance.  
+    Each machine must have MongoDB installed. In config.yaml, set mongodb_central to the central node and mongodb_local to the local machine itself. For the API, apply for central_token at https://instances.social/api/token. This token will be used to collect the list of Mastodon instances. For details, please see https://instances.social/.  
 
     To allow every machine to access the MongoDB on the central node, I suggest changing the net.bindIp setting in the MongoDB configuration file (mongo.conf) to 0.0.0.0. Additionally, I recommend changing the port and adding an access username and password to prevent access by unauthorized personnel. (If you are not sure how to configure it, please check [the recommended configuration tutorial](#mongodb-configure).)
 
@@ -80,7 +80,7 @@ Python: 3.9
       - `level`: Sets the logging level (e.g., DEBUG, INFO, WARNING, ERROR, CRITICAL).
       - `file`: Path to the log file where logs will be stored.
 
-5. **Add API Tokens**
+6. **Add API Tokens**
 
     Populate the `tokens/token_list.txt` file with your API tokens, one per line. Ensure the number of tokens exceeds the number of parallel processes you intend to run.
 
