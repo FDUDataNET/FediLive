@@ -48,8 +48,8 @@ Python: 3.9
     This is a distributed parallel crawling program for multiple machines. First, a machine must be selected as the central node. This node is used to store instance information and the range of crawled data and publish crawling tasks to working nodes. The remaining machines act as working nodes to crawl data from the instance.  
     Each machine must have MongoDB installed. In config.yaml, set mongodb_central to the central node and mongodb_local to the local machine itself. For the API, apply for central_token at https://instances.social/api/token. This token will be used to collect the list of Mastodon instances. For details, please see https://instances.social/.  
 
-    To allow every machine to access the MongoDB on the central node, I suggest changing the net.bindIp setting in the MongoDB configuration file (mongo.conf) to 0.0.0.0. Additionally, I recommend changing the port and adding an access username and password to prevent access by unauthorized personnel. (If you are not sure how to configure it, please check [the recommended configuration tutorial](#mongodb-configure).)
-
+    To allow every machine to access the MongoDB on the central node, I suggest changing the net.bindIp setting in the MongoDB configuration file (mongo.conf) to 0.0.0.0. Additionally, I recommend changing the port and adding an access username and password to prevent access by unauthorized personnel. (If you are not sure how to configure it, please check [the recommended configuration tutorial](#mongodb-configure).)  
+    You need to manually change these items and fill them into config.yaml.  
     ```yaml
     mongodb_central:
       username: "central_admin"
