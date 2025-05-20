@@ -11,8 +11,7 @@ from pymongo.errors import DuplicateKeyError
 from multiprocessing import Process
 import logging
 import random
-from utils import judge_sleep_limit_table, judge_api_islimit, save_error_log, create_unique_index
-from mongo_utills import fetch_livefeed_id
+from utils import judge_sleep_limit_table, judge_api_islimit, save_error_log, create_unique_index, fetch_livefeed_id
 from config import Config
 
 logger = logging.getLogger(__name__)

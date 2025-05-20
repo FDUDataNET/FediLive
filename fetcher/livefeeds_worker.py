@@ -102,35 +102,36 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
     id_range = {}
     if current_round != 0:
         id_range = instance_info.get(f'round{current_round-1}_id_range', {})
-    r_in_nowround = -1
     token = tokens[worker_id % len(tokens)]
     headers = {'Authorization': f'Bearer {token}', 'Email': config.api.get('email', '')}
-    
-    while True:
-        r_in_nowround += 1
-        params = {
+
+    params = {
             "local": True,
             "limit": 40
-        }
+            }
+    
+    while True:
         if last_page_flag != -1:
             params['max_id'] = last_page_flag
         elif current_round != 0:
             params['max_id'] = id_range.get('min')
         
         try:
-            logger.debug(f"Request parameters: {params}")
             response = requests.get(livefeeds_url, headers=headers, params=params, timeout=5)
             if response.status_code == 200:
                 res_headers = {k.lower(): v for k, v in response.headers.items()}
                 judge_sleep(res_headers, instance_name)
                 data = response.json()
-                logger.info(f"Successfully fetched {len(data)} tweets.")
+                logger.info(f"Successfully fetched {len(data)} tweets from {instance_name}.")
 
                 # collect one toot from all instances rapidly to record the latest toot_id in specified duartion
                 if current_round == 0:
                     for item in data:
                         created_at = transform_ISO2datetime(item['created_at'])
-                        if global_duration['start_time'] <= created_at <= global_duration['end_time']:
+                        print("created_at:",created_at)
+                        print("start_time:",global_duration['start_time'])
+                        print("end_time:",global_duration['end_time'])
+                        if global_duration['start_time'] <= created_at and created_at <= global_duration['end_time']:
                             id_range['max'] = item['id']
                             id_range['min'] = item['id']
                             item['instance_name'] = instance_name
@@ -146,6 +147,7 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                             except Exception as e:
                                 logger.error(f"Error saving tweet: {e}")
                             update_round_idrange(collections['instances'],instance_info,id_range)
+                            return
                             
                         elif created_at < global_duration['start_time']:
                             logger.info(f"{instance_name} has no tweets in the specified duration.")
@@ -153,7 +155,15 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                                 {"name": instance_name},
                                 {"$set": {"round": max_round}}
                             )
+                            return
+                    logger.info(f"all tweets from {instance_name} are newer than end_time.")
+                    if 'link' not in res_headers or len(data) < 40:
                         return
+                    match = re.search(r'max_id=(\d+)', res_headers.get('link', ''))
+                    if match:
+                        last_page_flag = match.group(1)
+                        logger.info(f"params add max_id {last_page_flag}.")
+                            
                 # start to collect toots by round 
                 else:
                     current_duration = compute_current_duration(current_round, global_duration, max_round)
@@ -236,20 +246,20 @@ def process_task(worker_id, config, mongo_args, tokens, global_duration, max_rou
         max_round (int): The maximum number of rounds.
     """
 
-    client = MongoClient(mongo_args['mongo_uri'])
-    db = client[mongo_args['db_name']]
-    instances_collection = db[mongo_args['collections_names']['instances']]
+    central_client = MongoClient(mongo_args['central_mongo_uri'])
+    central_db = central_client['mastodon']
+    central_instances_collection = central_db['instances']
 
     local_client = MongoClient(mongo_args['local_mongo_uri'])
-    local_db = local_client[mongo_args['db_name']]
-    local_livefeeds_collection = local_db[mongo_args['collections_names']['livefeeds']]
-    local_error_collection = local_db[mongo_args['collections_names']['error_log']]
+    local_db = local_client['mastodon']
+    local_livefeeds_collection = local_db['livefeeds']
+    local_error_collection = local_db['error_log']
     create_unique_index(local_livefeeds_collection, 'sid')
 
     collections = {
         'livefeeds': local_livefeeds_collection,
         'error_log': local_error_collection,
-        'instances': instances_collection
+        'instances': central_instances_collection
     }
     while True:
         # Process each round
@@ -336,14 +346,8 @@ def main():
     process_list = []
     for i in range(args.processnum):
         process_args = {
-            'mongo_uri': central_mongodb_uri,
-            'local_mongo_uri': local_mongodb_uri,
-            'db_name': 'mastodon',
-            'collections_names': {
-                'livefeeds': 'livefeeds',
-                'error_log': 'error_log',
-                'instances': 'instances'
-            },
+            'central_mongo_uri': central_mongodb_uri,
+            'local_mongo_uri': local_mongodb_uri
         }
         p = Process(target=process_task, args=(args.id, config, process_args, tokens, global_duration, max_round))
         p.start()

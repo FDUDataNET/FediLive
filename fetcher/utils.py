@@ -7,6 +7,44 @@ import math
 
 logger = logging.getLogger(__name__)
 
+def fetch_livefeed_id(local_livefeeds_collection, limit_set, limit_dict, status_name, retry_thresh=10):
+    """
+    Fetches a status ID from the livefeeds collection that is pending processing.
+    
+    Args:
+        local_livefeeds_collection (pymongo.collection.Collection): The livefeeds collection.
+        limit_set (set): Set of instances under rate limit.
+        local_collections (dict): Local MongoDB collections.
+        retry_thresh (int, optional): Retry threshold. Defaults to 10.
+    
+    Returns:
+        dict or None: The status information or None if not found.
+    """
+    retry_time = 0
+    while True:
+        judge_api_islimit(limit_dict,limit_set)
+        candidates = list(local_livefeeds_collection.find(
+            {
+                status_name: "pending",
+                "instance_name": {"$nin": list(limit_set)}
+            }
+        ).limit(5))
+            
+        for candidate in candidates:
+            batch = local_livefeeds_collection.find_one_and_update(
+                {"_id": candidate["_id"], "status": "pending"},
+                {"$set": {status_name: "read"}}
+            )
+            if batch:
+                logger.info(f"Found status ID: {batch['instance_name']}#{batch['id']}")
+                return batch
+        logger.info(f"No matching statuses found, retrying... Attempt {retry_time}")
+        time.sleep(2)
+        retry_time += 1
+        if retry_time >= retry_thresh and not limit_set:
+            logger.info("No eligible statuses found and limit_set is empty. Terminating task.")
+            return None
+
 def parse_datetime(dt_str):
     """
     Parse an ISO 8601 formatted datetime string.
@@ -135,7 +173,8 @@ def transform_ISO2datetime(time_str):
     Returns:
         datetime: The corresponding datetime object.
     """
-    return datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S.%fZ")
+    dt_naive = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S.%fZ")
+    return dt_naive.replace(tzinfo=timezone.utc)
 
 def transform_str2datetime(time_str):
     """
@@ -147,7 +186,8 @@ def transform_str2datetime(time_str):
     Returns:
         datetime: The corresponding datetime object.
     """
-    return datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+    dt_naive = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+    return dt_naive.replace(tzinfo=timezone.utc)
 
 def compute_round_time(global_duration):
     """
