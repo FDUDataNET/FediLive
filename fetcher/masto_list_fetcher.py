@@ -53,6 +53,7 @@ def fetch_instances():
             item['processable'] = True
             item['round'] = -1
             item['statuses'] = int(item.get('statuses', 0))
+            item['livefeeds_status'] = "pending"
             try:
                 instances_collection.insert_one(item)
                 insert_num += 1

@@ -44,42 +44,37 @@ def compute_current_duration(current_round, global_duration, max_round):
         dict: Dictionary with 'start_time' and 'end_time' for the current round.
     """
     if current_round < max_round:
-        new_start_time = global_duration['end_time'] - timedelta(hours=24*current_round)
+        new_start_time = global_duration['end_time'] - timedelta(hours=current_round)
     else:
         new_start_time = global_duration['start_time']
-    new_end_time = global_duration['end_time'] - timedelta(hours=24*current_round-24)
+    new_end_time = global_duration['end_time'] - timedelta(hours=current_round-1)
     return {'start_time': new_start_time, 'end_time': new_end_time}
 
-def fetch_instance(round_num, instances_collection, max_round):
+def fetch_instance(instances_collection, max_round):
     """
     Fetches an instance from the MongoDB collection based on the round number.
     
     Args:
-        round_num (int): The current round number.
         instances_collection (pymongo.collection.Collection): The instances collection.
         max_round (int): The maximum number of rounds.
     
     Returns:
         dict or None: The instance information or None if not found.
     """
-    if round_num < 0:
-        query = {
-            "round": round_num,
+    query = {
+            "round": {"$lt":max_round},
             "processable": True,
-            f"round{round_num+1}_id_range": {"$exists": False}
+            "livefeeds_status":"pending",
         }
-    else:
-        query = {
-            "round": round_num,
-            "processable": True,
-            f"round{round_num}_id_range": {"$exists": True},
-            f"round{round_num+1}_id_range": {"$exists": False}
-        }
+    update = {
+        "$inc": {"round": 1},
+        "$set": {"livefeeds_status": "read"}
+    }
     return instances_collection.find_one_and_update(
         query,
-        {"$set": {"round": round_num + 1}},
+        update,
         return_document=True,
-        sort=[("statuses", -1)]
+        sort=[("round", 1), ("statuses", -1)]
     )
 
 def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, global_duration, max_round):
@@ -198,7 +193,7 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                                 {"$set": {"round": max_round}}
                             )
                             return
-                        elif created_at < current_duration['start_time']:   
+                        elif created_at < current_duration['start_time']:
                             update_round_idrange(collections['instances'],instance_info,id_range)
                             logger.info(f"round{current_round}: {instance_name} has no tweets in the current duration.")
                             return
@@ -216,7 +211,10 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                     logger.warning(f"round{current_round}: Encountered 429 or 503 error, retrying, timed out 8 times, set processable to server_busy. {instance_name}")
                     collections['instances'].update_one(
                         {"name": instance_name},
-                        {"$set": {"processable": "server_busy"}}
+                        {
+                            "$set": {"processable": "server_busy"},
+                            "$inc": {"round": -1} 
+                        }
                     )
                     return
             else:
@@ -279,19 +277,13 @@ def process_task(worker_id, config, mongo_args, tokens, global_duration, max_rou
         'instances': central_instances_collection
     }
     while True:
-        # Process each round
-
-        return_flag = 1
-
-        for round_num in range(max_round + 1):
-            while True:
-                instance_info = fetch_instance(round_num - 1, collections['instances'], max_round)
-                if instance_info:
-                    logger.info(f"Found instance: {instance_info['name']}, starting processing.")
-                    fetch_livefeeds(instance_info, config, collections, tokens, worker_id, global_duration, max_round)
-                else:
-                    logger.info(f"No more instances to process for round {round_num}.")
-                    break
+        instance_info = fetch_instance(collections['instances'], max_round)
+        if instance_info:
+            logger.info(f"Found instance: {instance_info['name']}, starting processing round{instance_info['round']}.")
+            fetch_livefeeds(instance_info, config, collections, tokens, worker_id, global_duration, max_round)
+            collections['instances'].update_one({"name":instance_info['name']},{"$set":{"livefeeds_status":"pending"}})
+        else:
+            logger.info(f"No more instances to process.")
             # After completing a round, check if there are any instances marked as "server_busy" 
             # that have been reset less than 5 times.
             busy_count = collections['instances'].count_documents({
@@ -302,7 +294,6 @@ def process_task(worker_id, config, mongo_args, tokens, global_duration, max_rou
                 ]
             })
             if busy_count > 0:
-                return_flag = 0
                 logger.info("Resetting processable flag for eligible 'server_busy' instances to True.")
                 # Update only those instances with reset_count not yet 5.
                 collections['instances'].update_many(
@@ -320,8 +311,7 @@ def process_task(worker_id, config, mongo_args, tokens, global_duration, max_rou
                 )
             else:
                 logger.info(f"No more instances need to reset processable to true from server_busy.")
-        if return_flag:
-            return
+                return
             
 
 
