@@ -1,10 +1,8 @@
 # fetcher/reboot.py
 from pymongo import MongoClient
 import re
-import logging
 from config import Config
-
-logger = logging.getLogger(__name__)
+import os
 
 def remove_round_flag_instances(collection):
     """
@@ -16,11 +14,11 @@ def remove_round_flag_instances(collection):
 
     # 1. Update the "round" field in all documents to -1
     collection.update_many({}, {"$set": {"round": -1}})
-    logger.info("Updated 'round' field to -1 for all documents.")
+    print("Updated 'round' field to -1 for all documents.")
 
     # 2. For documents where "processable" is "server_busy", update its value to True
     collection.update_many({"processable": "server_busy"}, {"$set": {"processable": True}})
-    logger.info("Updated 'processable' from 'server_busy' to True.")
+    print("Updated 'processable' from 'server_busy' to True.")
 
     # 3. Remove keys matching the pattern "^round.*_id_range$" from all documents
     pattern = re.compile(r'^round.*_id_range$')
@@ -33,7 +31,7 @@ def remove_round_flag_instances(collection):
                 unset_fields[key] = ""  # For $unset, the value can be an empty string
         if unset_fields:
             collection.update_one({"_id": doc["_id"]}, {"$unset": unset_fields})
-    logger.info(f"Removed round_*_id_range key")
+    print(f"Removed round_*_id_range key")
 
 def drop_collection(collections,name):
     """
@@ -43,10 +41,34 @@ def drop_collection(collections,name):
     
     try:
         collections[name].drop()
-        logger.info(f"Droped local {name}.")
+        print(f"Droped local {name}.")
     except Exception as e:
-        logger.error(f"Droped local {name} ERROR: {e}")
+        print(f"Droped local {name} ERROR: {e}")
 
+def delete_log_files():
+    """
+    remove files: ./error.log 和 ./logs/app.log
+    """
+    files_to_delete = [
+        "./error.log",
+        "./logs/app.log"
+    ]
+
+    for file_path in files_to_delete:
+        try:
+            # 检查文件是否存在
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"success remove: {file_path}")
+        except Exception as e:
+            print(f"when remove ({file_path}): {e}")
+
+def clear_reset_count(collection):
+    try:
+        collection.update_many({},{"$set": {"reset_count": 0}})
+        print(f"clear_reset_count.")
+    except Exception as e:
+        print(f"clear_reset_count ERROR: {e}")
 
 def main():
     """
@@ -69,18 +91,22 @@ def main():
     local_db = local_client['mastodon']
     local_livefeeds_collection = local_db['livefeeds']
     local_context_collection = local_db['context']
+    local_boostersfavourites_collection = local_db['boostersfavourites']
 
 
     collections = {
         'livefeeds': local_livefeeds_collection,
         'instances': instances_collection,
-        'context' : local_context_collection
+        'context' : local_context_collection,
+        'boostersfavourites': local_boostersfavourites_collection
     }
 
     remove_round_flag_instances(collections['instances'])
+    clear_reset_count(collections['instances'])
     drop_collection(collections,'livefeeds')
     drop_collection(collections,'boostersfavourites')
     drop_collection(collections,'context')
+    delete_log_files()
 
 if __name__ == "__main__":
     main()

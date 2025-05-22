@@ -65,13 +65,15 @@ def fetch_instance(round_num, instances_collection, max_round):
     if round_num < 0:
         query = {
             "round": round_num,
-            "processable": True
+            "processable": True,
+            f"round{round_num+1}_id_range": {"$exists": False}
         }
     else:
         query = {
             "round": round_num,
             "processable": True,
-            f"round{round_num}_id_range": {"$exists": True}
+            f"round{round_num}_id_range": {"$exists": True},
+            f"round{round_num+1}_id_range": {"$exists": False}
         }
     return instances_collection.find_one_and_update(
         query,
@@ -104,13 +106,14 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
         id_range = instance_info.get(f'round{current_round-1}_id_range', {})
     token = tokens[worker_id % len(tokens)]
     headers = {'Authorization': f'Bearer {token}', 'Email': config.api.get('email', '')}
-
+    r_in_currentround = 0
     params = {
             "local": True,
             "limit": 40
             }
     
     while True:
+        r_in_currentround  = r_in_currentround+1
         if last_page_flag != -1:
             params['max_id'] = last_page_flag
         elif current_round != 0:
@@ -128,9 +131,6 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                 if current_round == 0:
                     for item in data:
                         created_at = transform_ISO2datetime(item['created_at'])
-                        print("created_at:",created_at)
-                        print("start_time:",global_duration['start_time'])
-                        print("end_time:",global_duration['end_time'])
                         if global_duration['start_time'] <= created_at and created_at <= global_duration['end_time']:
                             id_range['max'] = item['id']
                             id_range['min'] = item['id']
@@ -141,35 +141,40 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                             item['context_status'] = 'pending'
                             try:
                                 collections['livefeeds'].insert_one(item)
-                                logger.info(f"Saved a tweet from {instance_name}.")
+                                logger.info(f"round{current_round}: Saved toot {item['sid']}. {instance_name}.")
                             except DuplicateKeyError:
-                                logger.warning("Duplicate tweet found, skipping.")
+                                logger.warning(f"round{current_round}: Duplicate tweet found, skipping. {instance_name}.")
                             except Exception as e:
-                                logger.error(f"Error saving tweet: {e}")
+                                logger.error(f"round{current_round}: Error saving tweet: {e}. {instance_name}.")
                             update_round_idrange(collections['instances'],instance_info,id_range)
+                            logger.info(f"round{current_round}: update_round_idrange to max:{id_range['max']}, min:{id_range['min']}. {instance_name}.")
                             return
                             
                         elif created_at < global_duration['start_time']:
-                            logger.info(f"{instance_name} has no tweets in the specified duration.")
+                            logger.info(f"round{current_round}: {instance_name} has no toots in the specified duration.")
                             collections['instances'].update_one(
                                 {"name": instance_name},
                                 {"$set": {"round": max_round}}
                             )
                             return
-                    logger.info(f"all tweets from {instance_name} are newer than end_time.")
+                    logger.info(f"round{current_round}: all tweets from {instance_name} are newer than end_time.")
                     if 'link' not in res_headers or len(data) < 40:
                         return
                     match = re.search(r'max_id=(\d+)', res_headers.get('link', ''))
                     if match:
                         last_page_flag = match.group(1)
-                        logger.info(f"params add max_id {last_page_flag}.")
+                        logger.info(f"round{current_round}: params add max_id {last_page_flag}. {instance_name}.")
                             
                 # start to collect toots by round 
                 else:
                     current_duration = compute_current_duration(current_round, global_duration, max_round)
                     if len(data) != 0:
-                        id_range['max'] = data[0]['id']
-                        id_range['min'] = data[-1]['id']
+                        if r_in_currentround == 1:
+                            id_range['max'] = data[0]['id']
+                            id_range['min'] = data[-1]['id']
+                        else:
+                            id_range['min'] = data[-1]['id']
+
                     for item in data:
                         created_at = transform_ISO2datetime(item['created_at'])
                         if current_duration['start_time'] <= created_at <= current_duration['end_time']:
@@ -180,13 +185,22 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                             item['context_status'] = 'pending'
                             try:
                                 collections['livefeeds'].insert_one(item)
-                                logger.info(f"Saved a tweet from {instance_name}.")
+                                logger.info(f"round{current_round}: Saved a tweet from {instance_name}.")
                             except DuplicateKeyError:
-                                logger.warning("Duplicate tweet found, skipping.")
+                                logger.warning(f"round{current_round}: Duplicate tweet found, skipping. {instance_name}")
                             except Exception as e:
-                                logger.error(f"Error saving tweet: {e}")
-                        else:
+                                logger.error(f"round{current_round}: Error saving tweet: {e}. {instance_name}")
+                        elif created_at < global_duration['start_time']:
+                            logger.info(f"round{current_round}: {instance_name} has no tweets in the global duration.")
                             update_round_idrange(collections['instances'],instance_info,id_range)
+                            collections['instances'].update_one(
+                                {"name": instance_name},
+                                {"$set": {"round": max_round}}
+                            )
+                            return
+                        elif created_at < current_duration['start_time']:   
+                            update_round_idrange(collections['instances'],instance_info,id_range)
+                            logger.info(f"round{current_round}: {instance_name} has no tweets in the current duration.")
                             return
                 
                 if 'link' not in res_headers or len(data) < 40:
@@ -196,38 +210,41 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                     last_page_flag = match.group(1)
             elif response.status_code in [503, 429]:
                 retry_time += 1
-                time.sleep(random.random())
-                logger.warning("Encountered 429 or 503 error, retrying...")
-                if retry_time > 0:
+                time.sleep(10)
+                logger.warning(f"round{current_round}: Encountered 429 or 503 error, retrying... {instance_name}")
+                if retry_time > 8:
+                    logger.warning(f"round{current_round}: Encountered 429 or 503 error, retrying, timed out 8 times, set processable to server_busy. {instance_name}")
                     collections['instances'].update_one(
                         {"name": instance_name},
-                        {"$set": {"processable": "server_busy", "round": max_round}}
+                        {"$set": {"processable": "server_busy"}}
                     )
                     return
             else:
-                logger.error(f"Error fetching tweets from {instance_name}: {response.status_code}")
+                logger.error(f"round{current_round}: Error fetching tweets from {instance_name}: {response.status_code}")
                 collections['instances'].update_one(
                     {"name": instance_name},
-                    {"$set": {"round": max_round, "processable": False}}
+                    {"$set": {"processable": False}}
                 )
                 return
         except requests.exceptions.Timeout:
             retry_time += 1
-            time.sleep(random.random())
-            logger.warning("Request timed out, retrying...")
-            if retry_time > 0:
+            time.sleep(10)
+            logger.warning(f"round{current_round}: Request to {instance_name} timed out, retrying...")
+            if retry_time > 8:
+                logger.warning(f"round{current_round}: Request to {instance_name} timed out 8 times, set processable to false")
                 collections['instances'].update_one(
                     {"name": instance_name},
                     {"$set": {"processable": False}}
                 )
                 return
         except Exception as e:
-            logger.exception(f"Exception while connecting to {instance_name}")
+            logger.exception(f"round{current_round}: Exception while connecting to {instance_name}")
             collections['instances'].update_one(
                 {"name": instance_name},
                 {"$set": {"processable": False}}
             )
             return
+        time.sleep(random.random())
 
 def process_task(worker_id, config, mongo_args, tokens, global_duration, max_round):
     """
@@ -272,39 +289,33 @@ def process_task(worker_id, config, mongo_args, tokens, global_duration, max_rou
                 else:
                     logger.info(f"No more instances to process for round {round_num}.")
                     break
-
-        # After completing a round, check if there are any instances marked as "server_busy" 
-        # that have been reset less than 5 times.
-        busy_count = collections['instances'].count_documents({
-            "processable": "server_busy",
-            "$or": [
-                {"reset_count": {"$exists": False}},
-                {"reset_count": {"$lt": 5}}
-            ]
-        })
-        if busy_count > 0:
-            logger.info("Resetting processable flag for eligible 'server_busy' instances to True.")
-            # Update only those instances with reset_count not yet 5.
-            collections['instances'].update_many(
-                {
-                    "processable": "server_busy",
-                    "$or": [
-                        {"reset_count": {"$exists": False}},
-                        {"reset_count": {"$lt": 5}}
-                    ]
-                },
-                {
-                    "$set": {"processable": True},
-                    "$inc": {"reset_count": 1}
-                }
-            )
-            # Optional: sleep for a while to ensure server load is reduced
-            time.sleep(5)
-        else:
-            # If no eligible instance is marked as server_busy, exit the loop
-            break
-    #client.close()
-    local_client.close()
+            # After completing a round, check if there are any instances marked as "server_busy" 
+            # that have been reset less than 5 times.
+            busy_count = collections['instances'].count_documents({
+                "processable": "server_busy",
+                "$or": [
+                    {"reset_count": {"$exists": False}},
+                    {"reset_count": {"$lt": 10}}
+                ]
+            })
+            if busy_count > 0:
+                logger.info("Resetting processable flag for eligible 'server_busy' instances to True.")
+                # Update only those instances with reset_count not yet 5.
+                collections['instances'].update_many(
+                    {
+                        "processable": "server_busy",
+                        "$or": [
+                            {"reset_count": {"$exists": False}},
+                            {"reset_count": {"$lt": 10}}
+                        ]
+                    },
+                    {
+                        "$set": {"processable": True},
+                        "$inc": {"reset_count": 1}
+                    }
+                )
+            else:
+                logger.info(f"No more instances need to reset processable to true from server_busy.")
 
 
 def main():
