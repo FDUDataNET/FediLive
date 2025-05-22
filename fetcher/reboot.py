@@ -33,6 +33,10 @@ def remove_round_flag_instances(collection):
             collection.update_one({"_id": doc["_id"]}, {"$unset": unset_fields})
     print(f"Removed round_*_id_range key")
 
+    # 4. set processableable to true
+    collection.update_many({}, {"$set": {"processable": True}})
+    print("set processableable to true")
+
 def drop_collection(collections,name):
     """
     Drops the provided collection.

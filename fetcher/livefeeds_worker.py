@@ -280,6 +280,9 @@ def process_task(worker_id, config, mongo_args, tokens, global_duration, max_rou
     }
     while True:
         # Process each round
+
+        return_flag = 1
+
         for round_num in range(max_round + 1):
             while True:
                 instance_info = fetch_instance(round_num - 1, collections['instances'], max_round)
@@ -299,6 +302,7 @@ def process_task(worker_id, config, mongo_args, tokens, global_duration, max_rou
                 ]
             })
             if busy_count > 0:
+                return_flag = 0
                 logger.info("Resetting processable flag for eligible 'server_busy' instances to True.")
                 # Update only those instances with reset_count not yet 5.
                 collections['instances'].update_many(
@@ -316,6 +320,9 @@ def process_task(worker_id, config, mongo_args, tokens, global_duration, max_rou
                 )
             else:
                 logger.info(f"No more instances need to reset processable to true from server_busy.")
+        if return_flag:
+            return
+            
 
 
 def main():

@@ -107,7 +107,7 @@ def judge_sleep(res_headers, instance_name):
     """
     # Convert all header keys to lowercase
     res_headers = {k.lower(): v for k, v in res_headers.items()}
-    if int(res_headers.get('x-ratelimit-remaining', 2)) <= 0:
+    if int(res_headers.get('x-ratelimit-remaining', 2)) <= 5:
         target_time_str = res_headers.get('x-ratelimit-reset')
         if target_time_str:
             target_time = parse_datetime(target_time_str.replace('T', ' '))
