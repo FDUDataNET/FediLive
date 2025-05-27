@@ -40,6 +40,9 @@ def get_context(instance, status_id, headers, local_collections):
                     local_collections['context'].insert_one(data)
                     logger.info(f"{instance}#{status_id}: success save context")
                     return True
+                else:
+                    logger.info(f"{instance}#{status_id}: has no context")
+                    return True
             elif response.status_code in [503, 429]:
                     retry_time += 1
                     time.sleep(10)
