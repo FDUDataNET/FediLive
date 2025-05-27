@@ -28,18 +28,18 @@ def fetch_livefeed_id(local_livefeeds_collection, limit_set, limit_dict, status_
                 status_name: "pending",
                 "instance_name": {"$nin": list(limit_set)}
             }
-        ).limit(5))
+        ).limit(10))
             
         for candidate in candidates:
             batch = local_livefeeds_collection.find_one_and_update(
-                {"_id": candidate["_id"], "status": "pending"},
+                {"_id": candidate["_id"], status_name: "pending"},
                 {"$set": {status_name: "read"}}
             )
             if batch:
                 logger.info(f"Found status ID: {batch['instance_name']}#{batch['id']}")
                 return batch
         logger.info(f"No matching statuses found, retrying... Attempt {retry_time}")
-        time.sleep(2)
+        time.sleep(30)
         retry_time += 1
         if retry_time >= retry_thresh and not limit_set:
             logger.info("No eligible statuses found and limit_set is empty. Terminating task.")
