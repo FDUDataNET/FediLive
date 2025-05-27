@@ -11,7 +11,7 @@ from pymongo.errors import DuplicateKeyError
 from multiprocessing import Process
 import logging
 import random
-from utils import judge_sleep_limit_table, judge_api_islimit, save_error_log, create_unique_index, fetch_livefeed_id
+from utils import judge_sleep_limit_table, judge_api_islimit, create_unique_index, fetch_livefeed_id
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ status_name = "context_status"
 
 def get_context(instance, status_id, headers, local_collections):
     context_url = f"https://{instance}/api/v1/statuses/{status_id}/context"
-    retry_thresh = 4
+    retry_thresh = 8
 
     retry_time = 0
     while True:
@@ -34,30 +34,32 @@ def get_context(instance, status_id, headers, local_collections):
                 res_headers = {k.lower(): v for k, v in response.headers.items()}
                 judge_sleep_limit_table(res_headers, instance,limit_dict,limit_set)
                 data = response.json()
+                logger.info(f"{instance}#{status_id}: success fetch context")
                 if (len(data['ancestors']) >0) or (len(data['descendants']) >0):
                     data['sid'] = f"{instance}#{status_id}"
                     local_collections['context'].insert_one(data)
+                    logger.info(f"{instance}#{status_id}: success save context")
                     return True
             elif response.status_code in [503, 429]:
                     retry_time += 1
-                    time.sleep(random.random())
-                    logger.warning("Encountered 429 or 503 error, retrying...")
+                    time.sleep(10)
+                    logger.warning(f"{instance}#{status_id}: Encountered 429 or 503 error, retrying...")
                     if retry_time > retry_thresh:
                         limit_set.add(instance)
                         limit_dict[instance] = datetime.now(timezone.utc) + timedelta(minutes=5)
                         return False
             else:
-                logger.error(f"Error fetching context for {instance}#{status_id}: {response.status_code}")
+                logger.error(f"{instance}#{status_id}: error fetching context: {response.status_code}")
                 return False
 
         except requests.exceptions.Timeout:
             retry_time += 1
             time.sleep(random.random())
-            logger.warning("Request timed out, retrying...")
+            logger.warning(f"{instance}#{status_id}: Request timed out, retrying...")
             if retry_time > retry_thresh:
                 return False
         except Exception as e:
-            logger.exception(f"Exception while connecting to {instance}#{status_id}: {e}")
+            logger.exception(f"{instance}#{status_id}: Exception while connecting: {e}")
             return False
 
 
@@ -82,17 +84,19 @@ def process_task(token, config, local_collections, terminate_flag):
                 no_pending_counter = 0
                 headers = {'Authorization': f'Bearer {token}', 'Email': config.api.get('email', '')}
                 success = get_context(info['instance_name'], info['id'], headers, local_collections)
+                time.sleep(random.random())
                 if success:
                     local_collections['livefeeds'].update_one(
                         {"_id": info["_id"]},
                         {"$set": {status_name: "completed"}}
                     )
-                    logger.info(f"Successfully fetched reblogs and favourites for {info['instance_name']}#{info['id']}")
-                # else:
-                #     local_collections['livefeeds'].update_one(
-                #         {"_id": info["_id"]},
-                #         {"$set": {"status": "pending"}}
-                #     )
+                    logger.info(f"Successfully fetched context for {info['instance_name']}#{info['id']}")
+                else:
+                    local_collections['livefeeds'].update_one(
+                        {"_id": info["_id"]},
+                        {"$set": {status_name: "error"}}
+                    )
+                    logger.info(f"Error fetched context for {info['instance_name']}#{info['id']}")
             else:
                 no_pending_counter += 1
                 logger.info(f"No pending statuses found, sleeping... (attempt {no_pending_counter})")
