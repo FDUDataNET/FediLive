@@ -282,6 +282,7 @@ def process_task(worker_id, config, mongo_args, tokens, global_duration, max_rou
             logger.info(f"Found instance: {instance_info['name']}, starting processing round{instance_info['round']}.")
             fetch_livefeeds(instance_info, config, collections, tokens, worker_id, global_duration, max_round)
             collections['instances'].update_one({"name":instance_info['name']},{"$set":{"livefeeds_status":"pending"}})
+            time.sleep(1)
         else:
             logger.info(f"No more instances to process.")
             # After completing a round, check if there are any instances marked as "server_busy" 
@@ -311,7 +312,7 @@ def process_task(worker_id, config, mongo_args, tokens, global_duration, max_rou
                 )
             else:
                 logger.info(f"No more instances need to reset processable to true from server_busy.")
-                return
+                # return
             
 
 
