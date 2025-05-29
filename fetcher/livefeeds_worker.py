@@ -166,9 +166,7 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                     if len(data) != 0:
                         if r_in_currentround == 1:
                             id_range['max'] = data[0]['id']
-                            id_range['min'] = data[-1]['id']
-                        else:
-                            id_range['min'] = data[-1]['id']
+                            id_range['min'] = data[0]['id']
 
                     for item in data:
                         created_at = transform_ISO2datetime(item['created_at'])
@@ -180,6 +178,7 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                             item['context_status'] = 'pending'
                             try:
                                 collections['livefeeds'].insert_one(item)
+                                id_range['min'] = item['id']
                                 logger.info(f"round{current_round}: Saved a tweet from {instance_name}.")
                             except DuplicateKeyError:
                                 logger.warning(f"round{current_round}: Duplicate tweet found, skipping. {instance_name}")
