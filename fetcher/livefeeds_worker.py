@@ -167,6 +167,12 @@ def fetch_livefeeds(instance_info, config, collections, tokens, worker_id, globa
                         if r_in_currentround == 1:
                             id_range['max'] = data[0]['id']
                             id_range['min'] = data[0]['id']
+                    else:
+                        logger.info(f"round{current_round}: {instance_name} has no tweets.")
+                        collections['instances'].update_one(
+                                {"name": instance_name},
+                                {"$set": {"round": max_round}}
+                            )
 
                     for item in data:
                         created_at = transform_ISO2datetime(item['created_at'])
