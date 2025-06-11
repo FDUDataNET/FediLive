@@ -6,10 +6,29 @@ FediLive is a data collection tool designed to quickly fetch **user interactions
 
 ___________________________________________________________________________
 
-[![License][license-image]][license-url]
+[![License][license-image]][license-url]  v1.0.0
 
 [license-image]:https://img.shields.io/github/license/FDUDataNET/FediLive
 [license-url]: https://github.com/FDUDataNET/FediLive/blob/Multi/LICENSE
+
+## Citation
+FediLive is developed and maintained by the [Big Data and Networking (DataNET) Group](https://fudan-datanet.mysxl.cn/) at Fudan University.
+
+If you use FediLive in your research, please cite our paper:
+```bash
+@inproceedings{Min2025FediLive,
+  author    = {Min, Shaojie and Wang, Shaobin and Luo, Yaxiao and Gao, Min and Gong, Qingyuan and Xiao, Yu and Chen, Yang},
+  title     = {{FediLive: A Framework for Collecting and Preprocessing Snapshots of Decentralized Online Social Networks}},
+  year      = {2025},
+  booktitle = {Companion Proceedings of the ACM on Web Conference 2025},
+  series    = {WWW '25},
+  publisher = {Association for Computing Machinery},
+  address   = {New York, NY, USA},
+  pages     = {765–768},
+  doi       = {10.1145/3701716.3715298},
+  url       = {https://doi.org/10.1145/3701716.3715298}
+}
+```
 
 ## Development Environment
 Tested on Ubuntu 20.04 LTS. Please ensure your device meets the following requirements:  
