@@ -6,10 +6,14 @@ FediLive is a data collection tool designed to quickly fetch **user interactions
 
 ___________________________________________________________________________
 
-[![License][license-image]][license-url]  v1.0.0
+[![License][license-image]][license-url]  ![Version][version-image] ![Python][python-image]
 
 [license-image]:https://img.shields.io/github/license/FDUDataNET/FediLive
 [license-url]: https://github.com/FDUDataNET/FediLive/blob/Multi/LICENSE
+[version-image]: https://img.shields.io/badge/version-1.0.0-brightgreen
+[python-image]: https://img.shields.io/badge/python-3.8--3.13-blue
+
+
 
 ## Citation
 FediLive is developed and maintained by the [Big Data and Networking (DataNET) Group](https://fudan-datanet.mysxl.cn/) at Fudan University.
