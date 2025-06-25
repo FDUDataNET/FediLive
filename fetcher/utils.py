@@ -8,15 +8,30 @@ logger = logging.getLogger(__name__)
 
 def transform_ISO2datetime(time_str):
     """
-    Converts an ISO 8601 formatted string to a datetime object.
+    Parse an ISO 8601 formatted datetime string.
+    
+    This function automatically handles trailing 'Z' by converting it to '+00:00'
+    and returns a datetime object with timezone information.
     
     Args:
-        time_str (str): ISO 8601 formatted time string.
-    
+        time_str (str): An ISO 8601 formatted datetime string, e.g., 
+                      "2025-03-05T12:34:56+00:00" or "2025-03-05T12:34:56Z".
+                      
     Returns:
-        datetime: Corresponding datetime object.
+        datetime or None: The parsed datetime object if successful, otherwise None.
     """
-    return datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+    if time_str.endswith('Z'):
+        time_str = time_str[:-1] + '+00:00'
+    try:
+        dt = datetime.fromisoformat(time_str)
+    except ValueError as e:
+        logger.error(f"Error parsing datetime string: {time_str}. Error: {e}")
+        return None
+    # If timezone information is missing, default to UTC.
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
 
 def compute_round_time(duration):
     """
