@@ -6,10 +6,14 @@ FediLive is a data collection tool designed to quickly fetch **user interactions
 
 ___________________________________________________________________________
 
-[![License][license-image]][license-url]  v1.0.0
+[![License][license-image]][license-url]  ![Version][version-image] ![Python][python-image]
 
 [license-image]:https://img.shields.io/github/license/FDUDataNET/FediLive
 [license-url]: https://github.com/FDUDataNET/FediLive/blob/Multi/LICENSE
+[version-image]: https://img.shields.io/badge/version-1.0.0-brightgreen
+[python-image]: https://img.shields.io/badge/python-3.8--3.13-blue
+
+
 
 ## Citation
 FediLive is developed and maintained by the [Big Data and Networking (DataNET) Group](https://fudan-datanet.mysxl.cn/) at Fudan University.
@@ -67,7 +71,7 @@ Python: 3.9
     This is a distributed parallel crawling program for multiple machines. First, a machine must be selected as the central node. This node is used to store instance information and the range of crawled data and publish crawling tasks to working nodes. The remaining machines act as working nodes to crawl data from the instance.  
     Each machine must have MongoDB installed. In config.yaml, set mongodb_central to the central node and mongodb_local to the local machine itself. For the API, apply for central_token at https://instances.social/api/token. This token will be used to collect the list of Mastodon instances. For details, please see https://instances.social/.  
 
-    To allow every machine to access the MongoDB on the central node, I suggest changing the net.bindIp setting in the MongoDB configuration file (mongo.conf) to 0.0.0.0. Additionally, I recommend changing the port and adding an access username and password to prevent access by unauthorized personnel. (If you are not sure how to configure it, please check [the recommended configuration tutorial](#mongodb-configure).)  
+    To allow every machine to access the MongoDB on the central node, I suggest changing the net.bindIp setting in the MongoDB configuration file (mongo.conf) to 0.0.0.0. **Additionally, I recommend changing the port and adding an access username and password to prevent access by unauthorized personnel**. (If you are not sure how to configure it, please check [the recommended configuration tutorial](#mongodb-configure).)  
     You need to manually change these items and fill them into config.yaml.  
     ```yaml
     mongodb_central:
@@ -180,7 +184,7 @@ Then install MongoDB on your server.
 
 ### 2.Modify the MongoDB configuration file
 Change net.bindIp to 0.0.0.0  
-Change net.port to non-default value (27017).  
+Change net.port to non-default value (27017 is default).  
 
 ### 3.Add an access user
 In your terminal, run the following commands:  
