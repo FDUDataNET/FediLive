@@ -184,7 +184,7 @@ Then install MongoDB on your server.
 
 ### 2.Modify the MongoDB configuration file
 Change net.bindIp to 0.0.0.0  
-Change net.port to non-default value (27017).  
+Change net.port to non-default value (27017 is default).  
 
 ### 3.Add an access user
 In your terminal, run the following commands:  
