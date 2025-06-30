@@ -73,7 +73,7 @@ def get_favourite_boost(instance, status_id, headers, local_collections,worker_i
                     logger.warning("Encountered 429 or 503 error, retrying...")
                     if retry_time > retry_thresh:
                         limit_set.add(instance)
-                        limit_dict[instance] = datetime.now(timezone.utc) + timedelta(minutes=5)
+                        limit_dict[instance] = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
                         save_error_log(local_collections['error_log'], "booster_favouriter", f"{instance}#{status_id}", "429or503", error_message=response.text)
                         return False
                 elif response.status_code in [401, 403, 404]:

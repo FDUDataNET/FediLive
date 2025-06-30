@@ -49,7 +49,7 @@ def get_context(instance, status_id, headers, local_collections):
                     logger.warning(f"{instance}#{status_id}: Encountered 429 or 503 error, retrying...")
                     if retry_time > retry_thresh:
                         limit_set.add(instance)
-                        limit_dict[instance] = datetime.now(timezone.utc) + timedelta(minutes=5)
+                        limit_dict[instance] = (datetime.now(timezone.utc) + timedelta(minutes=20)).isoformat()
                         return False
             else:
                 logger.error(f"{instance}#{status_id}: error fetching context: {response.status_code}")
@@ -81,6 +81,7 @@ def process_task(token, config, local_collections, terminate_flag):
     
     while not terminate_flag['terminate']:
         try:
+            judge_api_islimit(limit_dict, limit_set)
             info = fetch_livefeed_id(local_collections['livefeeds'], limit_set, limit_dict, status_name="context_status")
             if info:
                 # Reset counter if a pending status is found

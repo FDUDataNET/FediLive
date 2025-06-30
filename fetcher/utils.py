@@ -1,4 +1,3 @@
-# fetcher/utils.py
 import logging
 from pymongo.errors import DuplicateKeyError
 from datetime import datetime, timezone
@@ -14,7 +13,8 @@ def fetch_livefeed_id(local_livefeeds_collection, limit_set, limit_dict, status_
     Args:
         local_livefeeds_collection (pymongo.collection.Collection): The livefeeds collection.
         limit_set (set): Set of instances under rate limit.
-        local_collections (dict): Local MongoDB collections.
+        limit_dict (dict): Dictionary to store the instance's limit reset time.
+        status_name (str): The name of the status field to check.
         retry_thresh (int, optional): Retry threshold. Defaults to 10.
     
     Returns:
@@ -55,15 +55,16 @@ def parse_datetime(dt_str):
     Args:
         dt_str (str): An ISO 8601 formatted datetime string, e.g., 
                       "2025-03-05T12:34:56+00:00" or "2025-03-05T12:34:56Z".
-                      
+                          
     Returns:
         datetime or None: The parsed datetime object if successful, otherwise None.
     """
     if dt_str.endswith('Z'):
         dt_str = dt_str[:-1] + '+00:00'
     try:
+        # Use fromisoformat for robust ISO 8601 parsing.
         dt = datetime.fromisoformat(dt_str)
-    except ValueError as e:
+    except (ValueError, TypeError) as e:
         logger.error(f"Error parsing datetime string: {dt_str}. Error: {e}")
         return None
     # If timezone information is missing, default to UTC.
@@ -79,23 +80,24 @@ def create_unique_index(collection, index_name):
         collection (pymongo.collection.Collection): The MongoDB collection.
         index_name (str): The field name on which to create a unique index.
     """
-    existing_indexes = collection.index_information()
-    if index_name not in existing_indexes:
-        try:
+    try:
+        existing_indexes = collection.index_information()
+        if f"{index_name}_1" not in existing_indexes:
             collection.create_index([(index_name, 1)], unique=True)
             logger.info(f"Unique index on '{index_name}' created for collection '{collection.name}'.")
-        except DuplicateKeyError:
-            logger.error(f"Duplicate key error: A document violates the unique constraint on '{index_name}'.")
-        except Exception as e:
-            logger.error(f"Error creating index '{index_name}': {e}")
-    else:
-        logger.info(f"Unique index on '{index_name}' already exists for collection '{collection.name}'.")
+        else:
+            logger.info(f"Unique index on '{index_name}' already exists for collection '{collection.name}'.")
+    except DuplicateKeyError:
+        logger.error(f"Duplicate key error: A document violates the unique constraint on '{index_name}'.")
+    except Exception as e:
+        logger.error(f"Error creating index '{index_name}': {e}")
+
 
 def judge_sleep(res_headers, instance_name):
     """
     Handle rate limiting based on the API response headers by sleeping if necessary.
     
-    If the 'x-ratelimit-remaining' header is 0 or less, the function calculates the sleep 
+    If the 'x-ratelimit-remaining' header is 5 or less, the function calculates the sleep 
     time based on the 'x-ratelimit-reset' header and then sleeps until that time.
     
     Args:
@@ -105,17 +107,18 @@ def judge_sleep(res_headers, instance_name):
     Returns:
         bool: Returns False if it slept (indicating a delay), otherwise True.
     """
-    # Convert all header keys to lowercase
+    # Convert all header keys to lowercase for case-insensitive access
     res_headers = {k.lower(): v for k, v in res_headers.items()}
-    if int(res_headers.get('x-ratelimit-remaining', 2)) <= 5:
+    if int(res_headers.get('x-ratelimit-remaining', 6)) <= 5:
         target_time_str = res_headers.get('x-ratelimit-reset')
         if target_time_str:
-            target_time = parse_datetime(target_time_str.replace('T', ' '))
+            # FIX: Do not replace 'T' with a space. datetime.fromisoformat requires the 'T' separator.
+            target_time = parse_datetime(target_time_str)
             if target_time:
                 current_time = datetime.now(timezone.utc)
                 sleep_time = (target_time - current_time).total_seconds()
                 if sleep_time > 0:
-                    logger.info(f"[{instance_name}] Rate limit reached. Sleeping until {target_time.isoformat()}")
+                    logger.info(f"[{instance_name}] Rate limit reached. Sleeping for {sleep_time:.2f} seconds until {target_time.isoformat()}")
                     time.sleep(sleep_time)
                     return False
     return True
@@ -148,7 +151,7 @@ def save_error_log(collection, data_name, object_name, content, res_code='None',
         res_code (str, optional): Response code. Defaults to 'None'.
         error_message (str, optional): Error message. Defaults to 'None'.
     """
-    current_time = datetime.now()
+    current_time = datetime.now(timezone.utc)
     log_entry = {
         'loadtime': current_time,
         "data_name": data_name,
@@ -159,35 +162,42 @@ def save_error_log(collection, data_name, object_name, content, res_code='None',
     }
     try:
         collection.insert_one(log_entry)
-        logger.info(f"Saved error log: {log_entry}")
+        logger.info(f"Saved error log for {data_name} - {object_name}")
     except Exception as e:
         logger.error(f"Failed to save error log: {e}")
 
 def transform_ISO2datetime(time_str):
     """
     Convert an ISO 8601 formatted string to a datetime object.
+    This function is a wrapper around parse_datetime for backward compatibility.
     
     Args:
         time_str (str): An ISO 8601 formatted time string, e.g., "2025-03-05T12:34:56.789Z".
         
     Returns:
-        datetime: The corresponding datetime object.
+        datetime or None: The corresponding datetime object, or None on failure.
     """
-    dt_naive = datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S.%fZ")
-    return dt_naive.replace(tzinfo=timezone.utc)
+    # NOTE: The previous implementation using strptime was too rigid.
+    # Using the more robust parse_datetime function instead.
+    return parse_datetime(time_str)
+
 
 def transform_str2datetime(time_str):
     """
-    Convert a formatted time string to a datetime object.
+    Convert a formatted time string ('YYYY-MM-DD HH:MM:SS') to a datetime object.
     
     Args:
         time_str (str): A time string in the format 'YYYY-MM-DD HH:MM:SS'.
         
     Returns:
-        datetime: The corresponding datetime object.
+        datetime: The corresponding datetime object, localized to UTC.
     """
-    dt_naive = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
-    return dt_naive.replace(tzinfo=timezone.utc)
+    try:
+        dt_naive = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+        return dt_naive.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError) as e:
+        logger.error(f"Error parsing datetime string '{time_str}': {e}")
+        return None
 
 def compute_round_time(global_duration):
     """
@@ -208,7 +218,7 @@ def judge_sleep_limit_table(res_headers, instance_name, limit_dict, limit_set):
     Check rate limiting information from API response headers to determine whether to sleep or record limit state.
     
     - If 'x-ratelimit-remaining' <= 0, calculate sleep time based on 'x-ratelimit-reset' and sleep.
-    - If 'x-ratelimit-remaining' <= 50 and the reset time is in the future, record the limit state.
+    - If 'x-ratelimit-remaining' is low and the reset time is in the future, record the limit state.
     
     Args:
         res_headers (dict): The API response headers.
@@ -220,32 +230,38 @@ def judge_sleep_limit_table(res_headers, instance_name, limit_dict, limit_set):
         bool or None: Returns False if it slept, True if limit state was recorded, or None if no action was taken.
     """
     res_headers = {k.lower(): v for k, v in res_headers.items()}
-    remaining = int(res_headers.get('x-ratelimit-remaining', 2))
+    remaining = int(res_headers.get('x-ratelimit-remaining', 51)) # Default to a safe value
     target_time_str = res_headers.get('x-ratelimit-reset')
     
     if not target_time_str:
         return None
 
-    target_time = parse_datetime(target_time_str.replace('T', ' '))
+    # FIX: Do not replace 'T' with a space. datetime.fromisoformat requires the 'T' separator.
+    target_time = parse_datetime(target_time_str)
     if not target_time:
         return None
 
     current_time = datetime.now(timezone.utc)
     
-    # Sleep if the remaining limit is 0 or less.
+    # Sleep if the remaining limit is exhausted.
     if remaining <= 0:
         sleep_time = (target_time - current_time).total_seconds()
         if sleep_time > 0:
-            logger.info(f"{current_time} sleep to {target_time}")
+            logger.info(f"[{instance_name}] Rate limit exhausted. Sleeping for {sleep_time:.2f}s until {target_time.isoformat()}")
             time.sleep(sleep_time)
+            # After sleeping, the limit should be reset, so remove from the limited set.
+            limit_set.discard(instance_name)
+            limit_dict.pop(instance_name, None)
             return False
 
-    # If remaining limit is low, record the rate limit state.
+    # If remaining limit is low, proactively record the rate limit state to avoid hitting the limit.
     if remaining <= 50 and target_time > current_time:
         limit_dict[instance_name] = target_time.isoformat()
         limit_set.add(instance_name)
         logger.info(f"Added {instance_name} into limit dict with reset time {target_time.isoformat()}")
         return True
+    
+    return None
 
 def judge_api_islimit(limit_dict, limit_set):
     """
@@ -261,16 +277,20 @@ def judge_api_islimit(limit_dict, limit_set):
     current_time = datetime.now(timezone.utc)
     keys_to_remove = []
     
-    for key, value in limit_dict.items():
+    # Iterate over a copy of items to allow modification during iteration
+    for key, value in list(limit_dict.items()):
         target_time = parse_datetime(value)
         if not target_time:
+            keys_to_remove.append(key) # Remove invalid entries
             continue
         if target_time <= current_time:
             limit_set.discard(key)
             keys_to_remove.append(key)
+            logger.info(f"Rate limit for {key} has expired. Removing from limit set.")
     
     for key in keys_to_remove:
-        del limit_dict[key]
+        if key in limit_dict:
+            del limit_dict[key]
 
 def update_round_idrange(instances_collection, instance_info, current_round_id_range):
     """
