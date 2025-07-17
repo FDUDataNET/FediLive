@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient
 from pymongo.errors import DuplicateKeyError
 from multiprocessing import Process
+import threading
 import random
 import re
 import logging
@@ -14,6 +15,7 @@ from utils import (
     create_unique_index, judge_sleep, update_round_idrange,
     transform_ISO2datetime, transform_str2datetime, compute_round_time
 )
+from reactivate_whitelist import run_reactivation_task
 from config import Config
 
 # Logger configuration: error-level logs only record to file, not output to console
@@ -319,7 +321,10 @@ def process_task(worker_id, config, mongo_args, tokens, global_duration, max_rou
                 logger.info(f"No more instances need to reset processable to true from server_busy.")
                 # return
             
-
+def periodic_reactivation_task(interval_sec):
+    while True:
+        run_reactivation_task()
+        time.sleep(interval_sec)
 
 def main():
     """
@@ -333,18 +338,8 @@ def main():
     args = parser.parse_args()
     
     config = Config()
-    central_mongodb_uri = config.get_central_mongodb_uri()
-    #client = MongoClient(central_mongodb_uri)
-    #db = client['mastodon']
-    #instances_collection = db['instances']
-    
+    central_mongodb_uri = config.get_central_mongodb_uri() 
     local_mongodb_uri = config.get_local_mongodb_uri()
-    #local_client = MongoClient(local_mongodb_uri)
-    #local_db = local_client['mastodon']
-    #local_livefeeds_collection = local_db['livefeeds']
-    #local_error_collection = local_db['error_log']
-    
-
     
     with open(config.paths.get('token_list', 'tokens/token_list.txt'), 'r', encoding='utf-8') as f:
         tokens = f.read().splitlines()
@@ -356,6 +351,12 @@ def main():
     
     max_round = compute_round_time(global_duration)
     logger.info(f"Maximum rounds: {max_round}")
+
+    # 启动定时 reactivation 线程
+    reactivation_thread = threading.Thread(
+        target=periodic_reactivation_task, args=(250,), daemon=True
+    )
+    reactivation_thread.start()
 
     process_list = []
     for i in range(args.processnum):

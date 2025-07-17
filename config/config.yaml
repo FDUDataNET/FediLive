@@ -22,3 +22,7 @@ paths:
 logging:
   level: "INFO"
   file: "logs/app.log"
+
+whitelist:
+  - "mastodon.social"
+  - "mstdn.social"
