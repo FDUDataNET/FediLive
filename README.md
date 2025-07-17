@@ -114,7 +114,7 @@ Python: 3.9
     These tokens will be used to collect toots from various Mastodon instances. Tokens can be requested following the guidelines at https://docs.joinmastodon.org/.  
 6. **Add Instances Whitelist**
    
-   If the time range of the livefeeds you crawl is very large, some super large sites that can be crawled normally (such as mastodon.social) may occasionally have connection errors due to a large number of requests and be blacklisted by livefeeds_worker.py. Fill in the large sites that you know can be crawled in the whitelist, which can ensure that the sites you fill in will not be blacklisted.  
+    If the time range of the livefeeds you crawl is very large, some super large instances that can be crawled normally (such as mastodon.social) may occasionally have connection errors due to a large number of requests and be blacklisted by livefeeds_worker.py. Fill in the large instances that you know can be crawled in the whitelist, which can ensure that the instance you fill in will not be blacklisted
    
 
 ## Usage
