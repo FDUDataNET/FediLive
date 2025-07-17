@@ -100,6 +100,7 @@ def get_favourite_boost(instance, status_id, headers, local_collections,worker_i
         try:
             local_collections['boostersfavourites'].insert_one({
                 "sid": sid,
+                "loadtime": datetime.now(),
                 "reblogs": reblogs,
                 "favourites": favourites
             })
@@ -213,7 +214,7 @@ def process_task(worker_id, config, mongo_args, tokens, terminate_flag):
                     break
         except Exception as e:
             logger.exception(f"Exception during processing: {e}")
-            time.sleep(5)
+            time.sleep(31)
     local_client.close()
 
 

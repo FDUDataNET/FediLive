@@ -37,6 +37,7 @@ def get_context(instance, status_id, headers, local_collections):
                 logger.info(f"{instance}#{status_id}: success fetch context")
                 if (len(data['ancestors']) >0) or (len(data['descendants']) >0):
                     data['sid'] = f"{instance}#{status_id}"
+                    data['loadtime'] = datetime.now()
                     local_collections['context'].insert_one(data)
                     logger.info(f"{instance}#{status_id}: success save context")
                     return True
@@ -49,7 +50,7 @@ def get_context(instance, status_id, headers, local_collections):
                     logger.warning(f"{instance}#{status_id}: Encountered 429 or 503 error, retrying...")
                     if retry_time > retry_thresh:
                         limit_set.add(instance)
-                        limit_dict[instance] = (datetime.now(timezone.utc) + timedelta(minutes=20)).isoformat()
+                        limit_dict[instance] = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
                         return False
             else:
                 logger.error(f"{instance}#{status_id}: error fetching context: {response.status_code}")
