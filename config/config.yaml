@@ -23,6 +23,6 @@ logging:
   level: "INFO"
   file: "logs/app.log"
 
-whitelist:
+whitelist: 
   - "mastodon.social"
   - "mstdn.social"
