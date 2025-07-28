@@ -161,14 +161,14 @@ def main():
         for p in process_list:
             p.join()
     except KeyboardInterrupt:
+        logger.info("\n接收到中断信号，正在通知子进程优雅退出...")
         terminate_flag['terminate'] = True
         for p in process_list:
-            p.terminate()
-        logger.info("Terminated all processes.")
+            p.join() # 等待子进程完成当前任务后退出
+        logger.info("所有进程已优雅关闭。")
 
     local_client.close()
     logger.info("Context Worker task completed.")
 
 if __name__ == "__main__":
     main()
-    

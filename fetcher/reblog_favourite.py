@@ -15,8 +15,8 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-handler = logging.StreamHandler()  
-handler.setLevel(logging.DEBUG)    
+handler = logging.StreamHandler()
+handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
@@ -85,11 +85,11 @@ def get_favourite_boost(instance, status_id, headers, local_collections,worker_i
                     return False
 
             #except requests.exceptions.Timeout:
-            #    retry_time += 1
-            #    time.sleep(random.random())
-            #    logger.warning("Request timed out, retrying...")
-            #    if retry_time > retry_thresh:
-            #        save_error_log(local_collections['error_log'], "booster_favouriter", f"{instance}#{status_id}", "TimeOut")
+            #   retry_time += 1
+            #   time.sleep(random.random())
+            #   logger.warning("Request timed out, retrying...")
+            #   if retry_time > retry_thresh:
+            #       save_error_log(local_collections['error_log'], "booster_favouriter", f"{instance}#{status_id}", "TimeOut")
             except Exception as e:
                 save_error_log(local_collections['error_log'], "booster_favouriter", f"{instance}#{status_id}", "Error", error_message=str(e))
                 logger.exception(f"Exception while connecting to {instance}#{status_id}: {e}")
@@ -244,9 +244,9 @@ def main():
     # 在 main 函数中打印 tokens
     print("Loaded Tokens:", [f"{token[:5]}...{token[-5:]}" for token in tokens])
     #local_collections = {
-    #    'livefeeds': local_livefeeds_collection,
-    #    'error_log': local_error_collection,
-    #    'boostersfavourites': local_boostersfavourites_collection
+    #   'livefeeds': local_livefeeds_collection,
+    #   'error_log': local_error_collection,
+    #   'boostersfavourites': local_boostersfavourites_collection
     #}
     process_args = {
         'local_mongo_uri': local_mongodb_uri,
@@ -270,10 +270,11 @@ def main():
         for p in process_list:
             p.join()
     except KeyboardInterrupt:
+        logger.info("\n接收到中断信号，正在通知子进程优雅退出...")
         terminate_flag['terminate'] = True
         for p in process_list:
-            p.terminate()
-        logger.info("Terminated all processes.")
+            p.join() # 等待子进程完成当前任务后退出
+        logger.info("所有进程已优雅关闭。")
 
     #local_client.close()
     logger.info("Reblog and Favourite Worker task completed.")
