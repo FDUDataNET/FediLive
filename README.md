@@ -74,41 +74,48 @@ Python: 3.9
     To allow every machine to access the MongoDB on the central node, I suggest changing the net.bindIp setting in the MongoDB configuration file (mongo.conf) to 0.0.0.0. **Additionally, I recommend changing the port and adding an access username and password to prevent access by unauthorized personnel**. (If you are not sure how to configure it, please check [the recommended configuration tutorial](#mongodb-configure).)  
     You need to manually change these items and fill them into config.yaml.  
     ```yaml
-    mongodb_central:
+    mongodb_central: 
       username: "central_admin"
       password: "CentralPassword123!"
       host: "central.mongodb.server.com"
       port: 27017
 
-    mongodb_local:
+    mongodb_local: 
       username: "local_admin"
       password: "LocalPassword456!"
       host: "local.mongodb.server.com"
       port: 27018
 
-    api:
+    api: 
       central_token: "your_central_api_token"
       email: "your_email@example.com"
 
-    paths:
+    paths: 
       instances_list: "instances_list.txt"
       token_list: "tokens/token_list.txt"
 
-    logging:
+    logging: 
       level: "INFO"
       file: "logs/app.log"
+    
+    whitelist: 
+      - "mastodon.social"
+      - "mstdn.social"
     ```
 
     - **Logging Configuration**:
       - `level`: Sets the logging level (e.g., DEBUG, INFO, WARNING, ERROR, CRITICAL).
       - `file`: Path to the log file where logs will be stored.
 
-6. **Add API Tokens**
+5. **Add API Tokens**
 
     Populate the `tokens/token_list.txt` file with your API tokens, one per line. Ensure the number of tokens exceeds the number of parallel processes you intend to run.
 
-    These tokens will be used to collect toots from various Mastodon instances. Tokens can be requested following the guidelines at https://docs.joinmastodon.org/.
-
+    These tokens will be used to collect toots from various Mastodon instances. Tokens can be requested following the guidelines at https://docs.joinmastodon.org/.  
+6. **Add Instances Whitelist**
+   
+    If the time range of the livefeeds you crawl is very large, some super large instances that can be crawled normally (such as mastodon.social) may occasionally have connection errors due to a large number of requests and be blacklisted by livefeeds_worker.py. Fill in the large instances that you know can be crawled in the whitelist, which can ensure that the instance you fill in will not be blacklisted
+   
 
 ## Usage
 
@@ -132,7 +139,7 @@ Parameters:
 --start: Start time for fetching toots (format: YYYY-MM-DD HH:MM:SS) (UTC+0).  
 --end: End time for fetching toots (format: YYYY-MM-DD HH:MM:SS) (UTC+0).  
 
-### 3. Fetch Reblogs and Favourites
+### 3. Fetch Reblogs and Favourites  
 Run this on multiple machines in parallel.
 
 ```bash
@@ -142,7 +149,18 @@ Parameters:
 
 --processnum: Number of parallel processes.  
 
-### 4. Restart the experiment
+### 4. Fetch Contexts  
+Context refers to the complete conversation of a tweet (who replied and who replied).  
+Run this on multiple machines in parallel.
+
+```bash
+python ./fetcher/context.py --processnum 3 --id 0
+```
+Parameters:
+
+--processnum: Number of parallel processes.  
+
+### 5. Restart the experiment
 Run this on all machines to remove livefeeds and boosters favourites existed in MongoDB.
 Make sure backup your data before running this.
 
@@ -150,7 +168,7 @@ Make sure backup your data before running this.
 python ./fetcher/reboot.py
 ``` 
 
-### 5. Notes
+### 6. Notes
 
 When fetching toots, some errors may occur, but they are handled within the code. Note that the instances list obtained in <1. Fetch Instance Information> includes not only Mastodon instances but also other platforms connected to Mastodon. As a result, errors may arise during fetching toots, because FediLive use [Mastodon REST API](https://docs.joinmastodon.org/) to fetch toots; in such cases, the corresponding instance's "processable" flag in the database will be set to false. If the target instance is busy during crawling, its "processable" flag will be changed to "server_busy". You can check the detailed crawling status using mongosh.
 
