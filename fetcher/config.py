@@ -20,6 +20,7 @@ class Config:
         self.api = self.config.get('api', {})
         self.paths = self.config.get('paths', {})
         self.logging = self.config.get('logging', {})
+        self.whitelist = self.config.get('whitelist',[])
         
         self.setup_logging()
     
