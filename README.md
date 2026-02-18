@@ -1,7 +1,7 @@
 FediLive
 ==================
 
-FediLive is a data collection tool designed to quickly fetch **user interactions** from all Mastodon instances during a user-defined time period for downstream analysis.
+FediLive is a data collection tool designed to quickly fetch **whole platform activities** from all Mastodon instances during a user-defined time period for downstream analysis.
 
 
 ___________________________________________________________________________
