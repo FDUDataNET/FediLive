@@ -2,6 +2,7 @@ FediLive
 ==================
 
 FediLive is a data collection tool designed to quickly fetch **whole platform activities** from all Mastodon instances during a user-defined time period for downstream analysis.
+A dataset collected via FediLive over a period of approximately two weeks has been published on [Zenodo](https://zenodo.org/records/14869106).
 
 
 ___________________________________________________________________________
@@ -18,7 +19,7 @@ ___________________________________________________________________________
 ## Citation
 FediLive is developed and maintained by the [Big Data and Networking (DataNET) Group](https://fudan-datanet.mysxl.cn/) at Fudan University.
 
-If you use FediLive in your research, please cite our paper:
+If you use FediLive or the example dataset in your research, please cite our paper:
   ```bash
   @inproceedings{Min2025FediLive,
     author    = {Min, Shaojie and Wang, Shaobin and Luo, Yaxiao and Gao, Min and Gong, Qingyuan and Xiao, Yu and Chen, Yang},
@@ -190,8 +191,6 @@ ERROR: Due to a more serious problem, the software has not been able to perform 
 CRITICAL: A very serious error, indicating that the program itself may be unable to continue running.  
 
 
-## Datasets
-We collected approximately two weeks of data using FediLive and have published it on Zenodo. You can download the dataset here: https://zenodo.org/records/14869106
 
 ## MongoDB Configure
 
