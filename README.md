@@ -6,10 +6,14 @@ FediLive is a data collection tool designed to quickly fetch **platform-wide pub
 
 It currently provides **two running modes** via two seperated branches:
 
+
+
 - **A. Single version**: a lightweight version without MongoDB, suitable for single-machine or simpler crawling tasks.
-- **B. Multi version**: a distributed version with MongoDB support, suitable for multi-machine parallel crawling, task coordination, and large-scale snapshot collection.
+- **B. Multi version**: a distributed version with MongoDB support ([See MongoDB Guide](https://github.com/FDUDataNET/FediLive/blob/Multi/README.md#mongodb-setup-guide)), suitable for multi-machine parallel crawling, task coordination, and large-scale snapshot collection.
 
 ---
+
+
 
 [![License][license-image]][license-url] ![Version][version-image] ![Python][python-image]
 
@@ -67,18 +71,18 @@ FediLive supports collecting the following types of public Mastodon data:
 
 FediLive has been tested on Ubuntu 20.04 LTS.
 
-### Recommended environment
+### 1. Recommended environment
 
 - **OS**: Ubuntu 20.04 LTS (64-bit)
 - **Memory**: 8GB RAM or above
 - **Storage**: 20GB available space or above
 - **Python**: 3.8–3.13
 
-### Additional requirement for Multi version
+#### Additional requirement for Multi version
 
 - **MongoDB**: 5.0.30 recommended
 
-## Repository Branches
+### 2. Repository Branches
 
 FediLive currently has two branches:
 
@@ -87,21 +91,21 @@ FediLive currently has two branches:
 
 Clone the branch that matches your use case.
 
-### A. Clone Single version
+#### 3.A. Clone Single version
 
 ```bash
 git clone -b Single git@github.com:FDUDataNET/FediLive.git
 cd FediLive
 ```
 
-### B. Clone Multi version
+#### 3.B. Clone Multi version
 
 ```bash
 git clone -b Multi git@github.com:FDUDataNET/FediLive.git
 cd FediLive
 ```
 
-## Installation
+## Installation and Configuration
 
 The following installation steps are shared by both versions.
 
@@ -118,13 +122,8 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Configuration
 
-The configuration process differs depending on whether you use the **A. Single version** or the **B. Multi version**.
-
----
-
-## A. Single version Configuration
+### 3.A. Single Version Configuration
 
 The Single version does **not** require MongoDB.
 
@@ -144,9 +143,9 @@ logging:
   file: "logs/app.log"
 ```
 
-### Configuration fields
+#### Configuration fields
 
-#### API
+##### API
 
 - `instance_token`: token for retrieving the list of Mastodon instances from `instances.social`  
   Apply at: https://instances.social/api/token
@@ -157,22 +156,22 @@ logging:
 
 - `email`: your contact email
 
-#### Paths
+##### Paths
 
 - `instances_list`: file path used to save the retrieved list of instances
 
-#### Logging
+##### Logging
 
 - `level`: logging level, such as `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL`
 - `file`: log file path
 
 ---
 
-## B. Multi version Configuration
+### 3.B. Multi Version Configuration
 
 The Multi version is designed for **distributed parallel crawling across multiple machines**.
 
-### Architecture
+#### Architecture
 
 In the Multi version:
 
@@ -216,45 +215,45 @@ whitelist:
   - "mstdn.social"
 ```
 
-### Configuration fields
+#### Configuration fields
 
-#### MongoDB
+##### MongoDB
 
 - `mongodb_central`: connection information for the **central node** database
 - `mongodb_local`: connection information for the **local machine** database
 
-#### API
+##### API
 
 - `central_token`: token for collecting the list of Mastodon instances from `instances.social`  
   Apply at: https://instances.social/api/token
 - `email`: your contact email
 
-#### Paths
+##### Paths
 
 - `instances_list`: file path used to save the retrieved list of instances
 - `token_list`: file containing Mastodon API tokens, one token per line
 
-#### Logging
+##### Logging
 
 - `level`: logging level
 - `file`: log file path
 
-#### Whitelist
+##### Whitelist
 
 If the livefeeds time range is large, some large instances that are normally crawlable, such as `mastodon.social`, may occasionally encounter connection errors due to heavy request volume and may be blacklisted by `livefeeds_worker.py`.
 
 You can add known stable large instances to the `whitelist` so they will **not** be blacklisted automatically.
 
-## API Tokens
+### 4. API Tokens
 
-### A. Single version
+#### 4.A. Single Version
 
 You need:
 
 - one `instance_token`
 - one `livefeeds_token`
 
-### B. Multi version
+#### 4.B. Multi Version
 
 Populate `tokens/token_list.txt` with Mastodon API tokens, **one token per line**.
 
@@ -270,13 +269,13 @@ The usage differs slightly between the two versions. Shared steps are grouped to
 
 This step retrieves the list of Mastodon instances.
 
-#### A. Single version
+#### 1.A. Single Version
 
 ```bash
 python -m fetcher.masto_list_fetcher
 ```
 
-#### B. Multi version
+#### 1.B. Multi Version
 
 Run this on the **central node**:
 
@@ -288,7 +287,7 @@ python ./fetcher/masto_list_fetcher.py
 
 This step collects public posts during a specified time period.
 
-#### A. Single version
+#### 2.A. Single Version
 
 You can run this on one or multiple machines in parallel.
 
@@ -302,7 +301,7 @@ Parameters:
 - `--start`: start time, format `YYYY-MM-DD HH:MM:SS`
 - `--end`: end time, format `YYYY-MM-DD HH:MM:SS`
 
-#### B. Multi version
+#### 2.B. Multi Version
 
 Run this on multiple machines in parallel:
 
@@ -321,7 +320,7 @@ Parameters:
 
 This step collects users who reblogged or favourited posts.
 
-#### A. Single version
+#### 3.A. Single Version
 
 ```bash
 python -m fetcher.reblog_favourite --processnum 3
@@ -331,7 +330,7 @@ Parameters:
 
 - `--processnum`: number of parallel processes
 
-#### B. Multi version
+#### 3.B. Multi Version
 
 ```bash
 python ./fetcher/reblog_favourite.py --processnum 3 --id 0
@@ -346,11 +345,11 @@ Parameters:
 
 A context refers to the complete reply conversation of a post.
 
-#### A. Single version
+#### 4.A. Single Version
 
 This feature is not documented in the original Single README.
 
-#### B. Multi version
+#### 4.B. Multi Version
 
 Run this on multiple machines in parallel:
 
@@ -367,7 +366,7 @@ Parameters:
 
 This operation is documented only for the Multi version.
 
-#### B. Multi version
+#### 5.B. Multi Version
 
 Run this on **all machines** to remove existing livefeeds, reblogs, favourites, and related crawl state stored in MongoDB.
 
@@ -381,7 +380,7 @@ python ./fetcher/reboot.py
 
 If some large but normally crawlable instances were temporarily marked unavailable during crawling, you can reactivate them using the whitelist.
 
-#### B. Multi version
+#### 6.B. Multi Version
 
 ```bash
 python ./fetcher/reactivate_whitelist.py
@@ -429,7 +428,7 @@ logging:
 
 ## MongoDB Setup Guide
 
-This section is required **only for the Multi version**.
+This guidance is **only for the Multi version**.
 
 ### 1. Install MongoDB
 
@@ -495,7 +494,7 @@ Place FediLive crawled JSON files in the `data/` directory using the following n
 python preprocess/load_network.py --data_dir ./data
 ```
 
-### Sample output
+### Sample Output
 
 ```bash
 Network loaded with 15420 nodes and 87364 edges
