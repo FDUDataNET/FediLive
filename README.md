@@ -2,12 +2,12 @@
 
 # FediLive
 
-FediLive is a data collection tool designed to quickly fetch **platform-wide public activities** from Mastodon instances during a user-defined time period for downstream analysis.A dataset collected via FediLive over a period of approximately two weeks has been published on [Zenodo](https://zenodo.org/records/14869106).
+FediLive is a data collection tool designed to quickly fetch **platform-wide public activities** from Mastodon instances during a user-defined time period for downstream analysis. A dataset collected via FediLive over a period of approximately two weeks has been published on [Zenodo](https://zenodo.org/records/14869106).
 
-It currently provides **two running modes**:
+It currently provides **two running modes** via two seperated branches:
 
-- **Single version**: a lightweight version without MongoDB, suitable for single-machine or simpler crawling tasks.
-- **Multi-version**: a distributed version with MongoDB support, suitable for multi-machine parallel crawling, task coordination, and large-scale snapshot collection.
+- **A. Single version**: a lightweight version without MongoDB, suitable for single-machine or simpler crawling tasks.
+- **B. Multi version**: a distributed version with MongoDB support, suitable for multi-machine parallel crawling, task coordination, and large-scale snapshot collection.
 
 ---
 
@@ -22,7 +22,7 @@ It currently provides **two running modes**:
 
 FediLive is developed and maintained by the [Big Data and Networking (DataNET) Group](https://fudan-datanet.mysxl.cn/) at Fudan University.
 
-If you use FediLive in your research, please cite our paper:
+If you use FediLive or the example dataset in your research, please cite our paper:
 
 ```bibtex
 @inproceedings{Min2025FediLive,
@@ -48,20 +48,19 @@ FediLive supports collecting the following types of public Mastodon data:
 - **Contexts** of posts/conversations
 - **User interaction networks** for downstream preprocessing and analysis
 
-### Which version should I use?
+### Which version should you choose?
 
 #### Use the **Single version** if:
 
-- you want to run FediLive on a single machine,
-- you do not want to deploy MongoDB,
-- your crawling task is relatively small or simple,
-- you prefer a lightweight setup.
+- you intend to run FediLive on a single machine,
+- you do not intend to deploy MongoDB,
+- your crawling task is relatively small or you prefer a lightweight setup.
 
-#### Use the **Multi-version** if:
+#### Use the **Multi version** if:
 
-- you want to run FediLive on multiple machines in parallel,
+- you have the ability to run FediLive on multiple machines in parallel,
 - you need distributed task coordination,
-- you want to manage large-scale crawling more robustly,
+- you intend to manage large-scale crawling more efficiently,
 - you need centralized storage of instance status and crawl progress.
 
 ## Development Environment
@@ -75,7 +74,7 @@ FediLive has been tested on Ubuntu 20.04 LTS.
 - **Storage**: 20GB available space or above
 - **Python**: 3.8–3.13
 
-### Additional requirement for Multi-version
+### Additional requirement for Multi version
 
 - **MongoDB**: 5.0.30 recommended
 
@@ -83,19 +82,19 @@ FediLive has been tested on Ubuntu 20.04 LTS.
 
 FediLive currently has two branches:
 
-- **Single version**: `Single`
-- **Multi-version**: `Multi`
+- **A. Single version**: `Single`
+- **B. Multi version**: `Multi`
 
 Clone the branch that matches your use case.
 
-### Clone Single version
+### A. Clone Single version
 
 ```bash
 git clone -b Single git@github.com:FDUDataNET/FediLive.git
 cd FediLive
 ```
 
-### Clone Multi-version
+### B. Clone Multi version
 
 ```bash
 git clone -b Multi git@github.com:FDUDataNET/FediLive.git
@@ -121,11 +120,11 @@ pip install -r requirements.txt
 
 ## Configuration
 
-The configuration process differs depending on whether you use the **Single version** or the **Multi-version**.
+The configuration process differs depending on whether you use the **A. Single version** or the **B. Multi version**.
 
 ---
 
-## A. Single Version Configuration
+## A. Single version Configuration
 
 The Single version does **not** require MongoDB.
 
@@ -169,13 +168,13 @@ logging:
 
 ---
 
-## B. Multi-version Configuration
+## B. Multi version Configuration
 
-The Multi-version is designed for **distributed parallel crawling across multiple machines**.
+The Multi version is designed for **distributed parallel crawling across multiple machines**.
 
 ### Architecture
 
-In the Multi-version:
+In the Multi version:
 
 - one machine should be selected as the **central node**
 - the central node stores instance information, crawling ranges, and coordinates crawling tasks
@@ -248,14 +247,14 @@ You can add known stable large instances to the `whitelist` so they will **not**
 
 ## API Tokens
 
-### Single version
+### A. Single version
 
 You need:
 
 - one `instance_token`
 - one `livefeeds_token`
 
-### Multi-version
+### B. Multi version
 
 Populate `tokens/token_list.txt` with Mastodon API tokens, **one token per line**.
 
@@ -271,13 +270,13 @@ The usage differs slightly between the two versions. Shared steps are grouped to
 
 This step retrieves the list of Mastodon instances.
 
-#### Single version
+#### A. Single version
 
 ```bash
 python -m fetcher.masto_list_fetcher
 ```
 
-#### Multi-version
+#### B. Multi version
 
 Run this on the **central node**:
 
@@ -289,7 +288,7 @@ python ./fetcher/masto_list_fetcher.py
 
 This step collects public posts during a specified time period.
 
-#### Single version
+#### A. Single version
 
 You can run this on one or multiple machines in parallel.
 
@@ -303,7 +302,7 @@ Parameters:
 - `--start`: start time, format `YYYY-MM-DD HH:MM:SS`
 - `--end`: end time, format `YYYY-MM-DD HH:MM:SS`
 
-#### Multi-version
+#### B. Multi version
 
 Run this on multiple machines in parallel:
 
@@ -322,7 +321,7 @@ Parameters:
 
 This step collects users who reblogged or favourited posts.
 
-#### Single version
+#### A. Single version
 
 ```bash
 python -m fetcher.reblog_favourite --processnum 3
@@ -332,7 +331,7 @@ Parameters:
 
 - `--processnum`: number of parallel processes
 
-#### Multi-version
+#### B. Multi version
 
 ```bash
 python ./fetcher/reblog_favourite.py --processnum 3 --id 0
@@ -347,11 +346,11 @@ Parameters:
 
 A context refers to the complete reply conversation of a post.
 
-#### Single version
+#### A. Single version
 
 This feature is not documented in the original Single README.
 
-#### Multi-version
+#### B. Multi version
 
 Run this on multiple machines in parallel:
 
@@ -366,9 +365,9 @@ Parameters:
 
 ### 5. Restart / Reset an Experiment
 
-This operation is documented only for the Multi-version.
+This operation is documented only for the Multi version.
 
-#### Multi-version
+#### B. Multi version
 
 Run this on **all machines** to remove existing livefeeds, reblogs, favourites, and related crawl state stored in MongoDB.
 
@@ -382,7 +381,7 @@ python ./fetcher/reboot.py
 
 If some large but normally crawlable instances were temporarily marked unavailable during crawling, you can reactivate them using the whitelist.
 
-#### Multi-version
+#### B. Multi version
 
 ```bash
 python ./fetcher/reactivate_whitelist.py
@@ -396,7 +395,7 @@ python ./fetcher/reactivate_whitelist.py
 - Some errors may occur during crawling due to network instability, busy servers, heterogeneous instance behavior, or rate limits.
 - These errors are generally handled within the code.
 
-### Multi-version-specific notes
+### Multi version-specific notes
 
 The instance list retrieved in the first step may include not only Mastodon instances but also other platforms connected in the Fediverse ecosystem. As a result:
 
@@ -430,7 +429,7 @@ logging:
 
 ## MongoDB Setup Guide
 
-This section is required **only for the Multi-version**.
+This section is required **only for the Multi version**.
 
 ### 1. Install MongoDB
 
@@ -481,7 +480,7 @@ After MongoDB is configured, fill the corresponding connection information into:
 
 ## Preprocessing Usage Guide
 
-This section is mainly documented for the Multi-version and can be used after data collection.
+This section is mainly documented for the Multi version and can be used after data collection.
 
 ### Data Preparation
 
@@ -544,7 +543,7 @@ edge_metrics = analyze_grouped_subgraphs(G, group_type='edge_type')
 
 ## Recommended Quick Start
 
-### Quick start for Single version
+### A. Quick start for Single version
 
 ```bash
 git clone -b Single git@github.com:FDUDataNET/FediLive.git
@@ -558,7 +557,7 @@ python -m fetcher.livefeeds_worker --processnum 2 --start "2024-01-01 00:00:00" 
 python -m fetcher.reblog_favourite --processnum 3
 ```
 
-### Quick start for Multi-version
+### B. Quick start for Multi version
 
 ```bash
 git clone -b Multi git@github.com:FDUDataNET/FediLive.git
@@ -577,7 +576,7 @@ python ./fetcher/context.py --processnum 3 --id 0
 
 ## Version Differences at a Glance
 
-| Feature | Single version | Multi-version |
+| Feature | A. Single version | B. Multi version |
 |---|---|---|
 | MongoDB required | No | Yes |
 | Single-machine crawling | Yes | Yes |
