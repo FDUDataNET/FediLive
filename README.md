@@ -91,14 +91,14 @@ FediLive currently has two branches:
 
 Clone the branch that matches your use case.
 
-#### 3.A. Clone Single version
+### 3.A. Clone Single version
 
 ```bash
 git clone -b Single git@github.com:FDUDataNET/FediLive.git
 cd FediLive
 ```
 
-#### 3.B. Clone Multi version
+### 3.B. Clone Multi version
 
 ```bash
 git clone -b Multi git@github.com:FDUDataNET/FediLive.git
